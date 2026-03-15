@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     admin_panel_username: str = "admin"
     admin_panel_password: str = "change-me-admin"
+    admin_panel_secret_key: str = "change-me-admin-secret"
     firebase_service_account_path: str = "credentials/firebase-admin.json"
     firebase_service_account_json: str = ""
 
