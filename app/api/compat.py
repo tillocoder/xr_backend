@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.models.entities import User
 from app.services.auth_session_service import AuthSessionService
+from app.services.news_feed_service import build_news_feed_payload
+from app.services.text_translation_service import translate_text_via_gemini
 from app.services.user_service import ensure_user_exists
 
 
@@ -193,32 +195,38 @@ async def delete_account(
 
 
 @router.get("/news/feed")
-async def news_feed(limit: int = 40) -> dict[str, object]:
-    normalized_limit = max(1, min(limit, 100))
-    return {
-        "latest": [],
-        "liquidations": [],
-        "updatedAt": _utc_now().isoformat(),
-        "limit": normalized_limit,
-    }
+async def news_feed(
+    limit: int = 40,
+    lang: str = "en",
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    normalized_limit = max(1, min(limit, 50))
+    return await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
 
 
 @router.get("/home/overview")
-async def home_overview(news_limit: int = 10) -> dict[str, object]:
-    normalized_limit = max(1, min(news_limit, 100))
+async def home_overview(
+    news_limit: int = 10,
+    lang: str = "en",
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    normalized_limit = max(1, min(news_limit, 50))
+    news = await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
     updated_at = _utc_now().isoformat()
-    return {
-        "news": {
-            "latest": [],
-            "liquidations": [],
-            "updatedAt": updated_at,
-            "limit": normalized_limit,
-        },
-        "updatedAt": updated_at,
-    }
+    return {"news": news, "updatedAt": updated_at}
 
 
 @router.post("/translation/text")
-async def translate_text(payload: TranslationIn) -> dict[str, str]:
-    # Fallback compatibility response. Flutter already has upstream fallback.
-    return {"translatedText": payload.text}
+async def translate_text(
+    payload: TranslationIn,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    translated = await translate_text_via_gemini(
+        db,
+        text=payload.text,
+        target_lang=payload.targetLang,
+    )
+    if translated is None:
+        return {"translatedText": payload.text}
+    text, _model = translated
+    return {"translatedText": text}

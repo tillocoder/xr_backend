@@ -12,6 +12,7 @@ from app.api.learning import admin_router as learning_admin_router
 from app.api.learning import router as learning_router
 from app.api.me import router as me_router
 from app.api.ws import router as ws_router
+from app.admin_panel import setup_admin_panel
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import engine
@@ -76,6 +77,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_admin_panel(app)
 
 app.include_router(compat_router, prefix=settings.api_prefix)
 app.include_router(community_router, prefix=settings.api_prefix)

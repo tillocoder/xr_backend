@@ -320,3 +320,77 @@ class AuthSession(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class AiProviderConfig(Base):
+    __tablename__ = "ai_provider_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(24), default="gemini", nullable=False)
+    api_key: Mapped[str | None] = mapped_column(String(512))
+    model: Mapped[str] = mapped_column(String(64), default="gemini-1.5-flash", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class NewsArticle(Base):
+    __tablename__ = "news_articles"
+    __table_args__ = (
+        UniqueConstraint("uid", name="uq_news_articles_uid"),
+        Index("ix_news_articles_published_at", "published_at"),
+        Index("ix_news_articles_is_liquidation_published_at", "is_liquidation", "published_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uid: Mapped[str] = mapped_column(String(32), nullable=False)
+    source: Mapped[str] = mapped_column(String(80), nullable=False)
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    raw_title: Mapped[str] = mapped_column(String(512), nullable=False)
+    raw_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    image_url: Mapped[str | None] = mapped_column(String(1024))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_liquidation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NewsArticleTranslation(Base):
+    __tablename__ = "news_article_translations"
+    __table_args__ = (
+        UniqueConstraint("article_id", "lang", name="uq_news_article_translations_article_id_lang"),
+        Index("ix_news_article_translations_lang_created_at", "lang", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("news_articles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lang: Mapped[str] = mapped_column(String(8), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    model: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NewsFeedState(Base):
+    __tablename__ = "news_feed_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    date: Mapped[str] = mapped_column(String(10), nullable=False)
+    daily_released_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_ingest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_cleanup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_translate_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

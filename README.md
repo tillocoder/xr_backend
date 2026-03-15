@@ -32,6 +32,51 @@ $env:XR_AUTO_CREATE_SCHEMA="true"
 uvicorn app.main:app --reload --port 8000
 ```
 
+## Admin panel
+
+This backend ships with a built-in admin panel at:
+
+- `http://127.0.0.1:8000/admin-panel`
+
+Credentials are controlled via env vars (defaults are dev-only):
+
+- `XR_ADMIN_PANEL_USERNAME`
+- `XR_ADMIN_PANEL_PASSWORD`
+- `XR_ADMIN_PANEL_SECRET_KEY` (cookie signing key)
+
+## AI news translation (Gemini)
+
+The mobile app can fetch AI-translated crypto news via:
+
+- `GET /api/v1/news/feed?limit=40&lang=uz`
+- `GET /api/v1/home/overview?news_limit=10&lang=uz`
+
+And translate arbitrary text (used for full article bodies):
+
+- `POST /api/v1/translation/text` with JSON `{ "text": "...", "targetLang": "uz" }`
+
+### Configure API key / model
+
+Preferred (editable from the admin panel):
+
+1. Run migrations: `alembic upgrade head`
+2. Open `http://127.0.0.1:8000/admin-panel`
+3. Add/update **AiProviderConfig** row:
+   - `provider`: `gemini`
+   - `api_key`: your Google Gemini API key
+   - `model`: e.g. `gemini-3-flash-preview`
+   - `enabled`: `true`
+
+Fallback (env vars):
+
+- `XR_GEMINI_API_KEY` (or `GEMINI_API_KEY`)
+- `XR_GEMINI_MODEL` (or `GEMINI_MODEL`)
+
+### Publish rules / retention
+
+- Backend releases **max 1 new article per hour** and **max 12 per day** into the app feed.
+- Released items are kept for **10 days** and the client "All news" view caps at **50 items**.
+
 ## Cloudflare tunnel for APK testing
 
 This removes the USB or `localhost` dependency for testing on a real phone, but your PC and backend must still stay online. If you want the APK to work while the PC is off, you need to deploy the backend to a real server.
