@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from fastapi import Depends, Header, HTTPException, Request, WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.system.services import SystemStatusService
+from app.bootstrap.container import AppContainer
+from app.core.config import Settings
 from app.db.session import SessionLocal, get_db
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
@@ -59,9 +62,23 @@ async def get_ws_user(ws: WebSocket) -> CurrentUser:
     raise HTTPException(status_code=401, detail="Missing websocket authentication.")
 
 
-def get_cache(request: Request) -> RedisCache:
-    return request.app.state.cache
+def get_container(request: Request) -> AppContainer:
+    return request.app.state.container
 
 
-def get_bus(request: Request):
-    return request.app.state.bus
+def get_settings(container: AppContainer = Depends(get_container)) -> Settings:
+    return container.settings
+
+
+def get_cache(container: AppContainer = Depends(get_container)) -> RedisCache:
+    return container.cache
+
+
+def get_bus(container: AppContainer = Depends(get_container)):
+    return container.bus
+
+
+def get_system_status_service(
+    container: AppContainer = Depends(get_container),
+) -> SystemStatusService:
+    return container.system_status_service

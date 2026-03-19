@@ -25,9 +25,11 @@ class AuthSessionService:
         *,
         access_ttl: timedelta = timedelta(days=30),
         refresh_ttl: timedelta = timedelta(days=180),
+        last_seen_touch_interval: timedelta = timedelta(minutes=5),
     ) -> None:
         self._access_ttl = access_ttl
         self._refresh_ttl = refresh_ttl
+        self._last_seen_touch_interval = last_seen_touch_interval
 
     async def issue_session(self, db: AsyncSession, *, user_id: str) -> IssuedSession:
         now = _utc_now()
@@ -60,12 +62,9 @@ class AuthSessionService:
             return None
         if session.access_expires_at <= now:
             return None
-        await db.execute(
-            update(AuthSession)
-            .where(AuthSession.id == session.id)
-            .values(last_seen_at=now)
-        )
-        await db.commit()
+        last_seen_at = session.last_seen_at
+        if last_seen_at is None or (now - last_seen_at) >= self._last_seen_touch_interval:
+            session.last_seen_at = now
         return await db.get(User, session.user_id)
 
     async def refresh_session(self, db: AsyncSession, refresh_token: str) -> tuple[User, IssuedSession] | None:
