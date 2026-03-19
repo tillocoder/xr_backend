@@ -3,7 +3,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_current_user
@@ -34,6 +34,15 @@ class MeWalletsPayload(BaseModel):
 
 class MeWatchlistPayload(BaseModel):
     symbols: list[str] = Field(default_factory=list)
+
+
+class MeBootstrapPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    settings: dict[str, Any] = Field(default_factory=dict)
+    holdings: list[dict[str, Any]] = Field(default_factory=list)
+    linked_wallets: list[dict[str, Any]] = Field(default_factory=list, alias="linkedWallets")
+    watchlist: list[str] = Field(default_factory=list)
 
 
 class DailyRewardStatusResponse(BaseModel):
@@ -97,16 +106,59 @@ class MembershipPurchaseIntentResponse(BaseModel):
     message: str
 
 
-def _settings_store(request: Request) -> dict[str, dict[str, Any]]:
-    return request.app.state.user_settings
-
-
-def _wallets_store(request: Request) -> dict[str, list[dict[str, Any]]]:
-    return request.app.state.user_wallets
-
-
 def _daily_reward_service() -> DailyRewardService:
     return DailyRewardService()
+
+
+async def _get_or_create_user(db: AsyncSession, user_id: str) -> tuple[User, bool]:
+    user = await db.get(User, user_id)
+    if user is None:
+        return await ensure_user_exists(db, user_id), True
+    return user, False
+
+
+def _normalized_watchlist(symbols: list[str]) -> list[str]:
+    return sorted({item.strip().upper() for item in symbols if item.strip()})
+
+
+def _apply_settings_payload(user: User, payload: dict[str, Any]) -> bool:
+    next_settings = dict(payload)
+    current_settings = dict(user.settings_json if isinstance(user.settings_json, dict) else {})
+    if current_settings == next_settings:
+        return False
+    user.settings_json = next_settings
+    return True
+
+
+def _apply_holdings_payload(user: User, payload: list[dict[str, Any]]) -> bool:
+    next_holdings = list(payload)
+    current_holdings = list(user.holdings_json if isinstance(user.holdings_json, list) else [])
+    if current_holdings == next_holdings:
+        return False
+    user.holdings_json = next_holdings
+    return True
+
+
+def _apply_wallets_payload(user: User, payload: list[dict[str, Any]]) -> bool:
+    next_wallets = list(payload)
+    current_wallets = list(
+        user.linked_wallets_json if isinstance(user.linked_wallets_json, list) else []
+    )
+    if current_wallets == next_wallets:
+        return False
+    user.linked_wallets_json = next_wallets
+    return True
+
+
+def _apply_watchlist_payload(user: User, payload: list[str]) -> bool:
+    next_watchlist = _normalized_watchlist(payload)
+    current_watchlist = list(
+        user.watchlist_json if isinstance(user.watchlist_json, list) else []
+    )
+    if current_watchlist == next_watchlist:
+        return False
+    user.watchlist_json = next_watchlist
+    return True
 
 
 def _daily_reward_response(status: DailyRewardStatus) -> DailyRewardStatusResponse:
@@ -198,7 +250,6 @@ def _find_membership_plan(tier: str, plan_code: str) -> MembershipPlanResponse |
 
 @router.get("/bootstrap")
 async def get_bootstrap(
-    request: Request,
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -208,8 +259,10 @@ async def get_bootstrap(
         await db.commit()
         await db.refresh(user)
 
-    settings = dict(_settings_store(request).get(current_user.id, {}))
-    linked_wallets = list(_wallets_store(request).get(current_user.id, []))
+    settings = dict(user.settings_json if isinstance(user.settings_json, dict) else {})
+    linked_wallets = list(
+        user.linked_wallets_json if isinstance(user.linked_wallets_json, list) else []
+    )
     holdings = list(user.holdings_json if isinstance(user.holdings_json, list) else [])
     watchlist = sorted(
         {
@@ -306,14 +359,14 @@ async def create_membership_purchase_intent(
 @router.put("/settings")
 async def update_settings(
     payload: dict[str, Any],
-    request: Request,
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    await ensure_user_exists(db, current_user.id)
-    _settings_store(request)[current_user.id] = dict(payload)
-    await db.commit()
-    return {"ok": True}
+    user, created = await _get_or_create_user(db, current_user.id)
+    changed = _apply_settings_payload(user, payload)
+    if changed or created:
+        await db.commit()
+    return {"ok": True, "changed": changed}
 
 
 @router.put("/holdings")
@@ -322,25 +375,24 @@ async def update_holdings(
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    user = await db.get(User, current_user.id)
-    if user is None:
-        user = await ensure_user_exists(db, current_user.id)
-    user.holdings_json = list(payload.items)
-    await db.commit()
-    return {"ok": True}
+    user, created = await _get_or_create_user(db, current_user.id)
+    changed = _apply_holdings_payload(user, payload.items)
+    if changed or created:
+        await db.commit()
+    return {"ok": True, "changed": changed}
 
 
 @router.put("/wallets")
 async def update_wallets(
     payload: MeWalletsPayload,
-    request: Request,
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    await ensure_user_exists(db, current_user.id)
-    _wallets_store(request)[current_user.id] = list(payload.items)
-    await db.commit()
-    return {"ok": True}
+    user, created = await _get_or_create_user(db, current_user.id)
+    changed = _apply_wallets_payload(user, payload.items)
+    if changed or created:
+        await db.commit()
+    return {"ok": True, "changed": changed}
 
 
 @router.put("/watchlist")
@@ -349,18 +401,28 @@ async def update_watchlist(
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    user = await db.get(User, current_user.id)
-    if user is None:
-        user = await ensure_user_exists(db, current_user.id)
-    user.watchlist_json = sorted(
-        {
-            item.strip().upper()
-            for item in payload.symbols
-            if item.strip()
-        }
-    )
-    await db.commit()
-    return {"ok": True}
+    user, created = await _get_or_create_user(db, current_user.id)
+    changed = _apply_watchlist_payload(user, payload.symbols)
+    if changed or created:
+        await db.commit()
+    return {"ok": True, "changed": changed}
+
+
+@router.put("/bootstrap")
+async def update_bootstrap(
+    payload: MeBootstrapPayload,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    user, created = await _get_or_create_user(db, current_user.id)
+    changed = False
+    changed = _apply_settings_payload(user, payload.settings) or changed
+    changed = _apply_holdings_payload(user, payload.holdings) or changed
+    changed = _apply_wallets_payload(user, payload.linked_wallets) or changed
+    changed = _apply_watchlist_payload(user, payload.watchlist) or changed
+    if changed or created:
+        await db.commit()
+    return {"ok": True, "changed": changed}
 
 
 @router.get("/notifications", response_model=NotificationListResponse)

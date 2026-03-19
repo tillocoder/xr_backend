@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 
 from fastapi import FastAPI
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -29,6 +29,11 @@ from app.models.entities import (
     User,
     NewsArticle,
     NewsArticleTranslation,
+)
+from app.services.ai_provider_config_service import (
+    DEFAULT_GEMINI_MODEL,
+    MAX_GEMINI_API_KEYS,
+    mask_api_key,
 )
 
 
@@ -230,24 +235,107 @@ class AuthSessionAdmin(ModelView, model=AuthSession):
 
 
 class AiProviderConfigAdmin(ModelView, model=AiProviderConfig):
+    name = "Gemini API Key"
+    name_plural = "Gemini API Keys"
     column_list = [
         AiProviderConfig.id,
-        AiProviderConfig.provider,
+        AiProviderConfig.label,
+        AiProviderConfig.sort_order,
+        AiProviderConfig.api_key,
         AiProviderConfig.model,
         AiProviderConfig.enabled,
         AiProviderConfig.updated_at,
     ]
-    column_searchable_list = [AiProviderConfig.provider, AiProviderConfig.model]
-    column_default_sort = (AiProviderConfig.updated_at, True)
-    form_excluded_columns = [AiProviderConfig.created_at, AiProviderConfig.updated_at]
+    column_labels = {
+        AiProviderConfig.label: "Label",
+        AiProviderConfig.sort_order: "Priority",
+        AiProviderConfig.api_key: "API Key",
+        AiProviderConfig.model: "Model",
+        AiProviderConfig.enabled: "Enabled",
+        AiProviderConfig.updated_at: "Updated",
+    }
+    column_formatters = {
+        AiProviderConfig.api_key: lambda m, a: mask_api_key(m.api_key),
+    }
+    column_searchable_list = [AiProviderConfig.label, AiProviderConfig.model]
+    column_default_sort = [(AiProviderConfig.sort_order, False), (AiProviderConfig.updated_at, True)]
+    form_columns = [
+        AiProviderConfig.label,
+        AiProviderConfig.api_key,
+        AiProviderConfig.model,
+        AiProviderConfig.sort_order,
+        AiProviderConfig.enabled,
+    ]
+
+    async def on_model_change(self, data, model, is_created: bool, request: Request) -> None:
+        data["provider"] = "gemini"
+        data["model"] = str(data.get("model") or model.model or DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
+        data["sort_order"] = max(1, min(int(data.get("sort_order") or model.sort_order or 1), MAX_GEMINI_API_KEYS))
+        label = str(data.get("label") or model.label or "").strip()
+        data["label"] = label or f"Gemini Key {data['sort_order']}"
+        api_key = str(data.get("api_key") or model.api_key or "").strip()
+        if is_created and not api_key:
+            raise ValueError("API key is required.")
+
+        if is_created:
+            with self.session_maker(expire_on_commit=False) as session:
+                total = int(
+                    session.execute(
+                        select(func.count(AiProviderConfig.id)).where(AiProviderConfig.provider == "gemini")
+                    ).scalar()
+                    or 0
+                )
+                if total >= MAX_GEMINI_API_KEYS:
+                    raise ValueError(f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys.")
+
+    async def after_model_change(self, data, model, is_created: bool, request: Request) -> None:
+        with self.session_maker(expire_on_commit=False) as session:
+            current = session.get(AiProviderConfig, int(model.id))
+            if current is None:
+                return
+
+            rows = list(
+                session.execute(
+                    select(AiProviderConfig)
+                    .where(AiProviderConfig.provider == "gemini")
+                    .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.id.asc())
+                ).scalars().all()
+            )
+            rows = [row for row in rows if row.id != current.id]
+            target = max(1, min(int(current.sort_order or 1), len(rows) + 1))
+            rows.insert(target - 1, current)
+
+            for index, row in enumerate(rows, start=1):
+                row.sort_order = index
+                row.label = str(row.label or "").strip() or f"Gemini Key {index}"
+
+            session.commit()
+
+    async def after_model_delete(self, model, request: Request) -> None:
+        with self.session_maker(expire_on_commit=False) as session:
+            rows = list(
+                session.execute(
+                    select(AiProviderConfig)
+                    .where(AiProviderConfig.provider == "gemini")
+                    .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.id.asc())
+                ).scalars().all()
+            )
+            for index, row in enumerate(rows, start=1):
+                row.sort_order = index
+                row.label = str(row.label or "").strip() or f"Gemini Key {index}"
+            session.commit()
 
 
 class NewsArticleAdmin(ModelView, model=NewsArticle):
     column_list = [
         NewsArticle.id,
         NewsArticle.source,
+        NewsArticle.category,
+        NewsArticle.view_count,
         NewsArticle.is_liquidation,
         NewsArticle.published_at,
+        NewsArticle.released_at,
+        NewsArticle.notified_at,
         NewsArticle.raw_title,
         NewsArticle.url,
         NewsArticle.created_at,

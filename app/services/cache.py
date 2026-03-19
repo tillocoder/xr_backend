@@ -23,6 +23,33 @@ class RedisCache:
     def client(self) -> redis.Redis:
         return self._client
 
+    async def get_json(self, key: str) -> dict | list | None:
+        try:
+            raw = await self._client.get(key)
+        except RedisError:
+            return None
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
+
+    async def set_json(
+        self,
+        key: str,
+        payload: dict | list,
+        ttl_seconds: int = 120,
+    ) -> None:
+        try:
+            await self._client.set(
+                key,
+                json.dumps(payload, separators=(",", ":")),
+                ex=ttl_seconds,
+            )
+        except RedisError:
+            return
+
     async def get_profile(self, user_id: str) -> dict | None:
         try:
             raw = await self._client.get(f"profile:{user_id}")
@@ -90,6 +117,22 @@ class RedisCache:
             await self._client.set(f"user:{user_id}:unread_total", value, ex=ttl_seconds)
         except RedisError:
             return
+
+    async def ping(self) -> bool:
+        try:
+            return bool(await self._client.ping())
+        except RedisError:
+            return False
+
+    async def increment(self, key: str, *, ttl_seconds: int) -> tuple[int, int]:
+        try:
+            value = int(await self._client.incr(key))
+            if value == 1:
+                await self._client.expire(key, max(1, ttl_seconds))
+            ttl = int(await self._client.ttl(key))
+        except RedisError:
+            return 0, 0
+        return value, max(0, ttl)
 
     async def close(self) -> None:
         try:

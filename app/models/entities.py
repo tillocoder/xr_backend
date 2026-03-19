@@ -39,6 +39,8 @@ class User(Base):
     reward_pro_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     watchlist_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     holdings_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    settings_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    linked_wallets_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -327,8 +329,10 @@ class AiProviderConfig(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(24), default="gemini", nullable=False)
+    label: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     api_key: Mapped[str | None] = mapped_column(String(512))
-    model: Mapped[str] = mapped_column(String(64), default="gemini-1.5-flash", nullable=False)
+    model: Mapped[str] = mapped_column(String(64), default="gemini-3-flash-preview", nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -342,19 +346,27 @@ class NewsArticle(Base):
     __tablename__ = "news_articles"
     __table_args__ = (
         UniqueConstraint("uid", name="uq_news_articles_uid"),
+        Index("ux_news_articles_url", "url", unique=True),
         Index("ix_news_articles_published_at", "published_at"),
         Index("ix_news_articles_is_liquidation_published_at", "is_liquidation", "published_at"),
+        Index("ix_news_articles_released_at_notified_at", "released_at", "notified_at"),
+        Index("ix_news_articles_category_published_at", "category", "published_at"),
+        Index("ix_news_articles_view_count_published_at", "view_count", "published_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     uid: Mapped[str] = mapped_column(String(32), nullable=False)
     source: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_guid: Mapped[str | None] = mapped_column(String(512))
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
     raw_title: Mapped[str] = mapped_column(String(512), nullable=False)
     raw_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     image_url: Mapped[str | None] = mapped_column(String(1024))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    category: Mapped[str] = mapped_column(String(32), default="altcoins", nullable=False)
+    view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_liquidation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -387,6 +399,7 @@ class NewsFeedState(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     daily_released_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    daily_fetch_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_ingest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_cleanup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -99,6 +99,45 @@ class LearningService:
         self._invalidate_public_cache()
         return self._to_admin(lesson)
 
+    async def update_video_lesson(
+        self,
+        db: AsyncSession,
+        lesson_id: str,
+        payload: LearningVideoLessonUpsertRequest,
+    ) -> AdminLearningVideoLessonResponse:
+        lesson = await self._get_lesson(db, lesson_id)
+
+        title = payload.title.strip()
+        if not title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title is required.",
+            )
+
+        normalized_video_url = self._normalize_media_or_url(
+            payload.videoUrl,
+            required=True,
+        )
+        normalized_thumbnail_url = self._normalize_media_or_url(payload.thumbnailUrl)
+        if normalized_thumbnail_url is None:
+            normalized_thumbnail_url = self._youtube_thumbnail_url(normalized_video_url)
+
+        lesson.title = title
+        lesson.summary = payload.summary.strip()
+        lesson.video_url = normalized_video_url
+        lesson.link_url = self._normalize_media_or_url(payload.linkUrl)
+        lesson.thumbnail_url = normalized_thumbnail_url
+        lesson.tag_key = payload.tagKey
+        lesson.duration_minutes = payload.durationMinutes
+        lesson.is_featured = payload.isFeatured
+        lesson.is_published = payload.isPublished
+        lesson.sort_order = payload.sortOrder
+
+        await db.commit()
+        await db.refresh(lesson)
+        self._invalidate_public_cache()
+        return self._to_admin(lesson)
+
     async def set_published(
         self,
         db: AsyncSession,
@@ -108,6 +147,20 @@ class LearningService:
     ) -> AdminLearningVideoLessonResponse:
         lesson = await self._get_lesson(db, lesson_id)
         lesson.is_published = value
+        await db.commit()
+        await db.refresh(lesson)
+        self._invalidate_public_cache()
+        return self._to_admin(lesson)
+
+    async def set_featured(
+        self,
+        db: AsyncSession,
+        lesson_id: str,
+        *,
+        value: bool,
+    ) -> AdminLearningVideoLessonResponse:
+        lesson = await self._get_lesson(db, lesson_id)
+        lesson.is_featured = value
         await db.commit()
         await db.refresh(lesson)
         self._invalidate_public_cache()

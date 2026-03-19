@@ -32,6 +32,8 @@ async def ensure_user_exists(
         is_pro=bool(is_pro),
         watchlist_json=[],
         holdings_json=[],
+        settings_json={},
+        linked_wallets_json=[],
     )
     db.add(user)
     await db.flush()

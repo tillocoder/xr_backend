@@ -85,6 +85,16 @@ async def create_learning_video(
     return lesson
 
 
+@admin_router.put("/videos/{lesson_id}", response_model=AdminLearningVideoLessonResponse)
+async def update_learning_video(
+    lesson_id: str,
+    payload: LearningVideoLessonUpsertRequest,
+    _: str = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminLearningVideoLessonResponse:
+    return await _learning_service.update_video_lesson(db, lesson_id, payload)
+
+
 @admin_router.post("/upload-video", response_model=LearningVideoUploadResponse)
 async def upload_learning_video_file(
     file: UploadFile = File(...),
@@ -112,6 +122,24 @@ async def unpublish_learning_video(
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
     return await _learning_service.set_published(db, lesson_id, value=False)
+
+
+@admin_router.post("/videos/{lesson_id}/feature", response_model=AdminLearningVideoLessonResponse)
+async def feature_learning_video(
+    lesson_id: str,
+    _: str = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminLearningVideoLessonResponse:
+    return await _learning_service.set_featured(db, lesson_id, value=True)
+
+
+@admin_router.post("/videos/{lesson_id}/unfeature", response_model=AdminLearningVideoLessonResponse)
+async def unfeature_learning_video(
+    lesson_id: str,
+    _: str = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminLearningVideoLessonResponse:
+    return await _learning_service.set_featured(db, lesson_id, value=False)
 
 
 @admin_router.delete("/videos/{lesson_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -252,6 +280,13 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
     .toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
     .hint { font-size: 12px; color: #8ea1bc; }
     .hint.block { display: block; margin-top: 8px; line-height: 1.45; }
+    .hint.warn-block {
+      color: #ffd5da;
+      background: rgba(71,33,40,.42);
+      border: 1px solid rgba(255,133,148,.22);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
     .list { display: grid; gap: 14px; margin-top: 16px; }
     .card {
       background: rgba(7, 17, 31, .8);
@@ -343,6 +378,7 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
           <label>Video URL
             <input name="videoUrl" maxlength="1024" placeholder="https://youtube.com/watch?v=...">
             <span class="hint block">Paste a YouTube link or direct video URL, or leave this empty and upload a video file below.</span>
+            <span class="hint block warn-block" id="youtube-warning" hidden>YouTube links may show the YouTube player chrome inside the app. If you want a clean in-app video player with only the lesson itself, upload an MP4/WebM file instead.</span>
           </label>
           <label>Upload video file
             <input name="videoFile" type="file" accept="video/*">
@@ -399,6 +435,8 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
     const countEl = document.getElementById("lesson-count");
     const statusEl = document.getElementById("status");
     const formEl = document.getElementById("lesson-form");
+    const youtubeWarningEl = document.getElementById("youtube-warning");
+    const videoUrlInput = formEl.elements.namedItem("videoUrl");
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -412,6 +450,7 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
     function cardHtml(item) {
       const lessonId = JSON.stringify(item.id || "");
       const videoUrl = JSON.stringify(item.videoUrl || "");
+      const isYoutube = isYouTubeUrl(item.videoUrl || "");
       const thumb = item.thumbnailUrl
         ? `<img src="${escapeHtml(item.thumbnailUrl)}" alt="">`
         : `<span>XR</span>`;
@@ -420,6 +459,7 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
         `<span class="pill dim">${item.durationMinutes || 0} min</span>`,
         `<span class="pill dim">${item.isPublished ? "Published" : "Draft"}</span>`,
       ];
+      pills.unshift(`<span class="pill dim">${isYoutube ? "YouTube link" : "Uploaded / direct"}</span>`);
       if (item.isFeatured) {
         pills.unshift(`<span class="pill">Featured</span>`);
       }
@@ -455,6 +495,17 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
       }
       emptyEl.hidden = true;
       listEl.innerHTML = lessons.map(cardHtml).join("");
+    }
+
+    function isYouTubeUrl(value) {
+      return /(?:youtube[.]com|youtu[.]be)/i.test(String(value || ""));
+    }
+
+    function updateVideoSourceHint() {
+      if (!(videoUrlInput instanceof HTMLInputElement) || !youtubeWarningEl) {
+        return;
+      }
+      youtubeWarningEl.hidden = !isYouTubeUrl(videoUrlInput.value);
     }
 
     async function createLesson(payload) {
@@ -542,6 +593,12 @@ _ADMIN_PAGE_TEMPLATE = """<!doctype html>
       }
     });
 
+    if (videoUrlInput instanceof HTMLInputElement) {
+      videoUrlInput.addEventListener("input", updateVideoSourceHint);
+      videoUrlInput.addEventListener("change", updateVideoSourceHint);
+    }
+
+    updateVideoSourceHint();
     render();
   </script>
 </body>

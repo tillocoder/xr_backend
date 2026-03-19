@@ -4,8 +4,7 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai_provider_config_service import get_gemini_config
-from app.services.gemini_service import GeminiClient
+from app.services.gemini_service import build_gemini_client
 
 
 def _normalize_lang(lang: str) -> str:
@@ -36,10 +35,6 @@ async def translate_text_via_gemini(
     if lang == "en":
         return clean, ""
 
-    cfg = await get_gemini_config(db)
-    if cfg is None:
-        return None
-
     prompt_lang = "O'zbek" if lang == "uz" else ("Русский" if lang == "ru" else lang)
     prompt = f"""
 Translate the text below into {prompt_lang}.
@@ -53,7 +48,10 @@ TEXT:
 {clean}
 """.strip()
 
-    gemini = GeminiClient(cfg)
+    gemini = await build_gemini_client(db)
+    if gemini is None:
+        return None
+
     res = await gemini.generate_text(prompt=prompt, temperature=0.1)
     if res is None:
         return None
@@ -62,4 +60,3 @@ TEXT:
     if not out:
         return None
     return out, res.model
-
