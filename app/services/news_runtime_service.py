@@ -15,6 +15,7 @@ from app.services.news_feed_service import (
     load_pending_notification_entries,
     mark_news_entries_notified,
     run_news_pipeline,
+    squash_pending_notification_backlog,
 )
 from app.services.push_token_service import PushTokenService
 from app.ws.bus import RedisEventBus
@@ -40,7 +41,7 @@ class NewsRuntimeService:
         firebase_push_service: FirebasePushService,
         push_token_service: PushTokenService,
         poll_interval_seconds: int = 60 * 60,
-        max_notifications_per_cycle: int = 5,
+        max_notifications_per_cycle: int = 1,
     ) -> None:
         self._bus = bus
         self._firebase_push = firebase_push_service
@@ -76,6 +77,11 @@ class NewsRuntimeService:
         async with SessionLocal() as db:
             try:
                 await run_news_pipeline(db)
+                await squash_pending_notification_backlog(
+                    db,
+                    keep=self._max_notifications_per_cycle,
+                    now=_utc_now(),
+                )
                 pending_entries = await load_pending_notification_entries(
                     db,
                     limit=self._max_notifications_per_cycle,

@@ -36,6 +36,7 @@ def build_container() -> AppContainer:
         bus=bus,
         firebase_push_service=firebase_push_service,
         push_token_service=push_token_service,
+        max_notifications_per_cycle=1,
     )
     notification_service = NotificationService(
         push_token_service=push_token_service,

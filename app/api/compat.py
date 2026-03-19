@@ -285,11 +285,11 @@ async def delete_account(
 @router.get("/news/feed")
 async def news_feed(
     request: Request,
-    limit: int = 40,
+    limit: int = 12,
     lang: str = "en",
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    normalized_limit = max(1, min(limit, 50))
+    normalized_limit = max(1, min(limit, 20))
     cache_key = f"news:feed:{lang.lower()}:{normalized_limit}"
     cached = await _get_cached_payload(request, cache_key)
     if cached is not None:
@@ -310,7 +310,7 @@ async def news_list(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     normalized_page = max(1, page)
-    normalized_page_size = max(1, min(pageSize, 50))
+    normalized_page_size = max(1, min(pageSize, 30))
     normalized_sort = "trending" if (sort or "").strip().lower() == "trending" else "latest"
     normalized_category = (category or "").strip().lower() or "all"
     cache_key = (
@@ -352,12 +352,16 @@ async def home_overview(
     lang: str = "en",
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    normalized_limit = max(1, min(news_limit, 50))
+    normalized_limit = max(1, min(news_limit, 12))
     cache_key = f"home:overview:{lang.lower()}:{normalized_limit}"
     cached = await _get_cached_payload(request, cache_key)
     if cached is not None:
         return cached
-    news = await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
+    feed_cache_key = f"news:feed:{lang.lower()}:{normalized_limit}"
+    news = await _get_cached_payload(request, feed_cache_key)
+    if news is None:
+        news = await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
+        await _set_cached_payload(request, feed_cache_key, news)
     updated_at = _utc_now().isoformat()
     payload = {"news": news, "updatedAt": updated_at}
     await _set_cached_payload(request, cache_key, payload)

@@ -1327,13 +1327,20 @@ async def _release_pending_articles(
         return []
 
     cutoff = now - timedelta(days=RETENTION_DAYS)
-    candidate = await db.scalar(
+    candidate_sort_key = func.coalesce(NewsArticle.published_at, NewsArticle.created_at)
+    candidate_stmt = (
         select(NewsArticle)
         .where(NewsArticle.released_at.is_(None))
-        .where(func.coalesce(NewsArticle.published_at, NewsArticle.created_at) >= cutoff)
-        .order_by(NewsArticle.published_at.desc().nullslast(), NewsArticle.id.desc())
+        .where(candidate_sort_key >= cutoff)
+        .order_by(candidate_sort_key.desc(), NewsArticle.id.desc())
         .limit(1)
     )
+    if state.last_released_at is not None:
+        # Only the newest article since the previous release is eligible.
+        # Older backlog items stay unreleased and are eventually trimmed.
+        candidate_stmt = candidate_stmt.where(candidate_sort_key > state.last_released_at)
+
+    candidate = await db.scalar(candidate_stmt)
     if candidate is None:
         await db.flush()
         return []
@@ -1525,16 +1532,46 @@ async def load_released_news_entries(
 async def load_pending_notification_entries(
     db: AsyncSession,
     *,
-    limit: int = 5,
+    limit: int = 1,
 ) -> list[StoredNewsEntry]:
     candidates = await load_released_news_entries(
         db,
-        limit=max(limit * 4, 16),
+        limit=max(limit * 2, 8),
         only_unnotified=True,
         sort="latest",
     )
     ready = [entry for entry in candidates if entry.is_notification_ready()]
     return ready[: max(1, int(limit))]
+
+
+async def squash_pending_notification_backlog(
+    db: AsyncSession,
+    *,
+    keep: int = 1,
+    now: datetime | None = None,
+) -> int:
+    keep_count = max(0, int(keep))
+    stale_ids = (
+        await db.scalars(
+            select(NewsArticle.id)
+            .where(NewsArticle.released_at.is_not(None))
+            .where(NewsArticle.notified_at.is_(None))
+            .order_by(NewsArticle.released_at.desc().nullslast(), NewsArticle.id.desc())
+            .offset(keep_count)
+        )
+    ).all()
+    unique_ids = sorted({int(article_id) for article_id in stale_ids if article_id})
+    if not unique_ids:
+        return 0
+
+    marked_at = now or _utc_now()
+    result = await db.execute(
+        update(NewsArticle)
+        .where(NewsArticle.id.in_(unique_ids))
+        .values(notified_at=marked_at)
+    )
+    await db.commit()
+    return int(result.rowcount or 0)
 
 
 async def mark_news_entries_notified(
@@ -1604,7 +1641,7 @@ async def build_news_list_payload(
     normalized_lang = _normalize_lang(lang)
     normalized_sort = "trending" if (sort or "").strip().lower() == "trending" else "latest"
     normalized_page = max(1, int(page or 1))
-    normalized_page_size = max(1, min(int(page_size or 20), 50))
+    normalized_page_size = max(1, min(int(page_size or 20), 30))
     normalized_category = (category or "").strip().lower() or None
     offset = (normalized_page - 1) * normalized_page_size
 
@@ -1648,7 +1685,7 @@ async def build_news_feed_payload(
     limit: int,
 ) -> dict[str, object]:
     normalized_lang = _normalize_lang(lang)
-    effective_limit = max(1, min(int(limit or 40), 50))
+    effective_limit = max(1, min(int(limit or 12), 20))
 
     latest_entries = await load_released_news_entries(
         db,
