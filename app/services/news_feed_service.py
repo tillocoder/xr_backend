@@ -70,7 +70,7 @@ RSS_FEEDS: tuple[FeedProvider, ...] = (
         source="BeInCrypto",
         url="https://uz.beincrypto.com/feed/",
         source_lang="uz",
-        translation_targets=("ru",),
+        translation_targets=(),
     ),
     FeedProvider(
         source="CryptoPanic",
@@ -131,6 +131,7 @@ MAX_UNRELEASED_ARTICLES = MAX_STORED_ARTICLES - MAX_RELEASED_ARTICLES
 INGEST_MAX_ITEMS_PER_FEED = 10
 DUPLICATE_LOOKBACK_HOURS = 48
 DUPLICATE_CANDIDATE_LIMIT = 50
+RELEASE_SOURCE_ROTATION_LOOKAHEAD = max(8, len(RSS_FEEDS) * 2)
 
 
 @dataclass(frozen=True)
@@ -1315,6 +1316,35 @@ async def _maybe_ingest(db: AsyncSession, *, now: datetime) -> None:
     await db.commit()
 
 
+async def _load_last_released_source(db: AsyncSession) -> str | None:
+    stmt = (
+        select(NewsArticle.source)
+        .where(NewsArticle.released_at.is_not(None))
+        .order_by(NewsArticle.released_at.desc().nullslast(), NewsArticle.id.desc())
+        .limit(1)
+    )
+    value = await db.scalar(stmt)
+    normalized = str(value or "").strip()
+    return normalized or None
+
+
+def _pick_rotated_release_candidate(
+    candidates: list[NewsArticle],
+    *,
+    last_source: str | None,
+) -> NewsArticle | None:
+    if not candidates:
+        return None
+    if not last_source:
+        return candidates[0]
+
+    normalized_last_source = last_source.strip().lower()
+    for candidate in candidates:
+        if str(candidate.source or "").strip().lower() != normalized_last_source:
+            return candidate
+    return candidates[0]
+
+
 async def _release_pending_articles(
     db: AsyncSession,
     *,
@@ -1333,21 +1363,25 @@ async def _release_pending_articles(
         .where(NewsArticle.released_at.is_(None))
         .where(candidate_sort_key >= cutoff)
         .order_by(candidate_sort_key.desc(), NewsArticle.id.desc())
-        .limit(1)
+        .limit(RELEASE_SOURCE_ROTATION_LOOKAHEAD)
     )
     if state.last_released_at is not None:
         # Only the newest article since the previous release is eligible.
         # Older backlog items stay unreleased and are eventually trimmed.
         candidate_stmt = candidate_stmt.where(candidate_sort_key > state.last_released_at)
 
-    candidate = await db.scalar(candidate_stmt)
+    candidates = (await db.execute(candidate_stmt)).scalars().all()
+    last_source = await _load_last_released_source(db)
+    candidate = _pick_rotated_release_candidate(candidates, last_source=last_source)
     if candidate is None:
         await db.flush()
         return []
 
-    gemini = await build_gemini_client(db)
-    if gemini is None:
-        return []
+    gemini = None
+    if _translation_targets_for_source(str(candidate.source or "")):
+        gemini = await build_gemini_client(db)
+        if gemini is None:
+            return []
     await _ensure_article_translations(db, article=candidate, gemini=gemini)
 
     rows = (
