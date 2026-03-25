@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 
 from app.application.system.interfaces import AsyncDependencyProbe
@@ -14,5 +15,5 @@ class SystemStatusService:
         return {"ok": True}
 
     async def readiness_report(self) -> ReadinessReport:
-        dependencies = tuple([await probe.probe() for probe in self._probes])
+        dependencies = tuple(await asyncio.gather(*(probe.probe() for probe in self._probes)))
         return ReadinessReport.from_dependencies(dependencies)

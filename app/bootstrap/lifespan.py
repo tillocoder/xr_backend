@@ -17,6 +17,7 @@ from app.services.ai_provider_config_service import (
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
 from app.services.firebase_push_service import FirebasePushService
+from app.services.market_runtime_service import MarketRuntimeService
 from app.services.news_runtime_service import NewsRuntimeService
 from app.services.notification_service import NotificationService
 from app.services.push_token_service import PushTokenService
@@ -43,6 +44,11 @@ def build_container() -> AppContainer:
         firebase_push_service=firebase_push_service,
         bus=bus,
     )
+    market_runtime_service = MarketRuntimeService(
+        settings=settings,
+        cache=cache,
+        notification_service=notification_service,
+    )
     system_status_service = SystemStatusService(
         probes=(
             DatabaseHealthProbe(engine),
@@ -64,6 +70,7 @@ def build_container() -> AppContainer:
         auth_session_service=auth_session_service,
         firebase_push_service=firebase_push_service,
         news_runtime_service=news_runtime_service,
+        market_runtime_service=market_runtime_service,
         notification_service=notification_service,
         system_status_service=system_status_service,
         rate_limiter=rate_limiter,
@@ -90,9 +97,11 @@ async def lifespan(app):
 
     await container.bus.start(container.ws_manager.dispatch)
     await container.news_runtime_service.start()
+    await container.market_runtime_service.start()
     try:
         yield
     finally:
+        await container.market_runtime_service.stop()
         await container.news_runtime_service.stop()
         await container.bus.stop()
         await container.cache.close()

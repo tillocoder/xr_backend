@@ -2,8 +2,14 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_bus, get_cache, get_current_user
-from app.core.public_url import get_public_base_url_for_request
 from app.db.session import get_db
+from app.presentation.api.json_cache import JsonRouteCache
+from app.presentation.api.request_state import (
+    get_bus as get_request_bus,
+    get_notification_service,
+    get_public_base_url as get_request_public_base_url,
+    get_ws_manager,
+)
 from app.schemas.chat import (
     ChatConversationOut,
     ChatMessageCreate,
@@ -52,18 +58,40 @@ from app.services.reaction_service import react_to_post
 from app.ws.bus import RedisEventBus
 
 router = APIRouter(prefix="/community", tags=["community"])
+_COMMUNITY_PUBLIC_CACHE = JsonRouteCache(
+    namespace="community:public:v2",
+    ttl_setting_name="community_public_cache_ttl_seconds",
+    default_ttl_seconds=20,
+    min_ttl_seconds=10,
+    max_ttl_seconds=45,
+)
 
 
 def _community_service(request: Request) -> CommunityService:
     return CommunityService(
-        notification_service=request.app.state.notification_service,
-        bus=request.app.state.bus,
+        notification_service=get_notification_service(request),
+        bus=get_request_bus(request),
         public_base_url=_public_base_url(request),
     )
 
 
 def _public_base_url(request: Request) -> str:
-    return get_public_base_url_for_request(request)
+    return get_request_public_base_url(request)
+
+
+def _community_public_cache_key(request: Request, *parts: object) -> str:
+    return _COMMUNITY_PUBLIC_CACHE.build_key(_public_base_url(request), *parts)
+
+
+async def _invalidate_community_public_cache(
+    request: Request,
+    *prefix_groups: tuple[object, ...],
+) -> None:
+    for group in prefix_groups:
+        await _COMMUNITY_PUBLIC_CACHE.delete_prefix(
+            request,
+            _community_public_cache_key(request, *group),
+        )
 
 
 @router.get("/feed", response_model=FeedPage)
@@ -84,7 +112,13 @@ async def get_posts(
     limit: int = Query(default=15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityPostResponse]:
-    return await _community_service(request).list_posts(db, symbol=symbol, limit=limit)
+    cache_key = _community_public_cache_key(request, "posts", symbol or "", limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_posts(db, symbol=symbol, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/posts/{post_id}", response_model=CommunityPostResponse)
@@ -93,7 +127,13 @@ async def get_post(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> CommunityPostResponse:
-    return await _community_service(request).get_post(db, post_id)
+    cache_key = _community_public_cache_key(request, "post", post_id)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).get_post(db, post_id)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/posts/{post_id}/comments", response_model=list[CommunityCommentResponse])
@@ -103,7 +143,13 @@ async def get_post_comments(
     limit: int = Query(default=40, ge=1, le=120),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityCommentResponse]:
-    return await _community_service(request).list_comments(db, post_id=post_id, limit=limit)
+    cache_key = _community_public_cache_key(request, "post-comments", post_id, limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_comments(db, post_id=post_id, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/posts/{post_id}/reaction")
@@ -124,11 +170,19 @@ async def create_post(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CommunityPostResponse:
-    return await _community_service(request).create_post(
+    response = await _community_service(request).create_post(
         db,
         current_user_id=user.id,
         payload=payload,
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("profile-posts",),
+        ("profiles-recent",),
+        ("post", response.id),
+    )
+    return response
 
 
 @router.put("/posts/{post_id}", response_model=CommunityPostResponse)
@@ -139,12 +193,19 @@ async def update_post(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CommunityPostResponse:
-    return await _community_service(request).update_post(
+    response = await _community_service(request).update_post(
         db,
         current_user_id=user.id,
         post_id=post_id,
         payload=payload,
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("profile-posts",),
+        ("post", response.id),
+    )
+    return response
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -155,6 +216,13 @@ async def delete_post(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _community_service(request).delete_post(db, current_user_id=user.id, post_id=post_id)
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("profile-posts",),
+        ("post", post_id),
+        ("post-comments", post_id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -166,6 +234,11 @@ async def register_post_view(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _community_service(request).register_post_view(db, current_user_id=user.id, post_id=post_id)
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("post", post_id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -183,6 +256,11 @@ async def vote_on_poll(
         post_id=post_id,
         option_index=int(payload.get("optionIndex", -1)),
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("post", post_id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -194,12 +272,20 @@ async def add_comment(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CommunityCommentResponse:
-    return await _community_service(request).add_comment(
+    response = await _community_service(request).add_comment(
         db,
         current_user_id=user.id,
         post_id=post_id,
         payload=payload,
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("post", post_id),
+        ("post-comments", post_id),
+        ("profile-comments",),
+    )
+    return response
 
 
 @router.post(
@@ -222,6 +308,10 @@ async def react_to_comment(
         comment_id=comment_id,
         reaction_code=payload.reactionCode,
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("post-comments", post_id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -231,7 +321,13 @@ async def get_recent_profiles(
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityProfileResponse]:
-    return await _community_service(request).list_recent_profiles(db, limit=limit)
+    cache_key = _community_public_cache_key(request, "profiles-recent", limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_recent_profiles(db, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/search", response_model=list[CommunityProfileResponse])
@@ -241,7 +337,13 @@ async def search_profiles(
     limit: int = Query(default=8, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityProfileResponse]:
-    return await _community_service(request).search_profiles(db, query=q, limit=limit)
+    cache_key = _community_public_cache_key(request, "profiles-search", q, limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).search_profiles(db, query=q, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}", response_model=CommunityProfileResponse)
@@ -250,7 +352,13 @@ async def get_profile(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> CommunityProfileResponse:
-    return await _community_service(request).get_profile(db, uid)
+    cache_key = _community_public_cache_key(request, "profile", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).get_profile(db, uid)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/posts", response_model=list[CommunityPostResponse])
@@ -260,7 +368,13 @@ async def get_profile_posts(
     limit: int = Query(default=30, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityPostResponse]:
-    return await _community_service(request).list_posts_by_author(db, author_uid=uid, limit=limit)
+    cache_key = _community_public_cache_key(request, "profile-posts", uid, limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_posts_by_author(db, author_uid=uid, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/comments", response_model=list[CommunityCommentResponse])
@@ -270,7 +384,13 @@ async def get_profile_comments(
     limit: int = Query(default=40, ge=1, le=120),
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityCommentResponse]:
-    return await _community_service(request).list_comments_by_author(db, author_uid=uid, limit=limit)
+    cache_key = _community_public_cache_key(request, "profile-comments", uid, limit)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_comments_by_author(db, author_uid=uid, limit=limit)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/followers/count")
@@ -279,7 +399,13 @@ async def get_follower_count(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, int]:
-    return {"count": await _community_service(request).get_follower_count(db, uid=uid)}
+    cache_key = _community_public_cache_key(request, "followers-count", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = {"count": await _community_service(request).get_follower_count(db, uid=uid)}
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/following/count")
@@ -288,7 +414,13 @@ async def get_following_count(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, int]:
-    return {"count": await _community_service(request).get_following_count(db, uid=uid)}
+    cache_key = _community_public_cache_key(request, "following-count", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = {"count": await _community_service(request).get_following_count(db, uid=uid)}
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/followers", response_model=list[CommunityProfileResponse])
@@ -297,7 +429,13 @@ async def get_followers(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityProfileResponse]:
-    return await _community_service(request).list_followers(db, uid=uid)
+    cache_key = _community_public_cache_key(request, "followers", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_followers(db, uid=uid)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/following", response_model=list[CommunityProfileResponse])
@@ -306,7 +444,13 @@ async def get_following(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> list[CommunityProfileResponse]:
-    return await _community_service(request).list_following(db, uid=uid)
+    cache_key = _community_public_cache_key(request, "following", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).list_following(db, uid=uid)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.get("/profiles/{uid}/follow-state")
@@ -325,7 +469,13 @@ async def get_holding_summaries(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, CommunityPublicHoldingSummaryResponse]:
-    return await _community_service(request).get_public_holding_summaries(db, uid=uid)
+    cache_key = _community_public_cache_key(request, "holding-summaries", uid)
+    cached = await _COMMUNITY_PUBLIC_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _community_service(request).get_public_holding_summaries(db, uid=uid)
+    await _COMMUNITY_PUBLIC_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @router.post("/profiles/sync", response_model=CommunityProfileResponse)
@@ -335,7 +485,20 @@ async def sync_profile(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CommunityProfileResponse:
-    return await _community_service(request).sync_profile(db, current_user_id=user.id, payload=payload)
+    response = await _community_service(request).sync_profile(
+        db,
+        current_user_id=user.id,
+        payload=payload,
+    )
+    await _invalidate_community_public_cache(
+        request,
+        ("profile", user.id),
+        ("profiles-recent",),
+        ("profiles-search",),
+        ("followers", user.id),
+        ("following", user.id),
+    )
+    return response
 
 
 @router.put("/profiles/me", response_model=CommunityProfileResponse)
@@ -345,7 +508,20 @@ async def update_profile(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CommunityProfileResponse:
-    return await _community_service(request).update_profile(db, current_user_id=user.id, payload=payload)
+    response = await _community_service(request).update_profile(
+        db,
+        current_user_id=user.id,
+        payload=payload,
+    )
+    await _invalidate_community_public_cache(
+        request,
+        ("profile", user.id),
+        ("profiles-recent",),
+        ("profiles-search",),
+        ("followers", user.id),
+        ("following", user.id),
+    )
+    return response
 
 
 @router.post("/profiles/{uid}/follow", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -356,6 +532,13 @@ async def follow_profile(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _community_service(request).follow(db, current_user_id=user.id, target_uid=uid)
+    await _invalidate_community_public_cache(
+        request,
+        ("followers-count", uid),
+        ("following-count", user.id),
+        ("followers", uid),
+        ("following", user.id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -367,6 +550,13 @@ async def unfollow_profile(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _community_service(request).unfollow(db, current_user_id=user.id, target_uid=uid)
+    await _invalidate_community_public_cache(
+        request,
+        ("followers-count", uid),
+        ("following-count", user.id),
+        ("followers", uid),
+        ("following", user.id),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -425,7 +615,7 @@ async def get_presence(
     user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, bool]:
     del user
-    manager = request.app.state.ws_manager
+    manager = get_ws_manager(request)
     normalized = {
         uid.strip()
         for uid in uids
@@ -508,9 +698,9 @@ async def post_chat_message(
         message_type=payload.messageType,
         media_url=payload.mediaUrl,
         reply_to_message_id=payload.replyToMessageId,
-        notification_service=request.app.state.notification_service,
+        notification_service=get_notification_service(request),
         public_base_url=_public_base_url(request),
-        connection_manager=request.app.state.ws_manager,
+        connection_manager=get_ws_manager(request),
     )
 
 
@@ -534,9 +724,9 @@ async def post_chat_message_with_peer(
         message_type=payload.messageType,
         media_url=payload.mediaUrl,
         reply_to_message_id=payload.replyToMessageId,
-        notification_service=request.app.state.notification_service,
+        notification_service=get_notification_service(request),
         public_base_url=_public_base_url(request),
-        connection_manager=request.app.state.ws_manager,
+        connection_manager=get_ws_manager(request),
     )
 
 
@@ -567,9 +757,9 @@ async def post_chat_voice_message_with_peer(
         duration_ms=payload.durationMs,
         waveform=payload.waveform,
         reply_to_message_id=payload.replyToMessageId,
-        notification_service=request.app.state.notification_service,
+        notification_service=get_notification_service(request),
         public_base_url=_public_base_url(request),
-        connection_manager=request.app.state.ws_manager,
+        connection_manager=get_ws_manager(request),
     )
 
 
@@ -743,12 +933,18 @@ async def post_reaction(
     cache: RedisCache = Depends(get_cache),
     bus: RedisEventBus = Depends(get_bus),
 ) -> PostReactionStateOut:
-    return await react_to_post(
+    response = await react_to_post(
         db=db,
         cache=cache,
         bus=bus,
         post_id=post_id,
         user_id=user.id,
         reaction_type=payload.reactionKey,
-        notification_service=request.app.state.notification_service,
+        notification_service=get_notification_service(request),
     )
+    await _invalidate_community_public_cache(
+        request,
+        ("posts",),
+        ("post", post_id),
+    )
+    return response

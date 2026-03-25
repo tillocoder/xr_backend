@@ -8,6 +8,7 @@ from app.infrastructure.rate_limit.service import RedisRateLimiter
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
 from app.services.firebase_push_service import FirebasePushService
+from app.services.market_runtime_service import MarketRuntimeService
 from app.services.news_runtime_service import NewsRuntimeService
 from app.services.notification_service import NotificationService
 from app.services.push_token_service import PushTokenService
@@ -25,6 +26,7 @@ class AppContainer:
     auth_session_service: AuthSessionService
     firebase_push_service: FirebasePushService
     news_runtime_service: NewsRuntimeService
+    market_runtime_service: MarketRuntimeService
     notification_service: NotificationService
     system_status_service: SystemStatusService
     rate_limiter: RedisRateLimiter | None = None
@@ -39,4 +41,5 @@ class AppContainer:
         app.state.auth_session_service = self.auth_session_service
         app.state.firebase_push_service = self.firebase_push_service
         app.state.news_runtime_service = self.news_runtime_service
+        app.state.market_runtime_service = self.market_runtime_service
         app.state.notification_service = self.notification_service

@@ -37,13 +37,31 @@ from app.schemas.community import (
     CommunityUpdatePostRequest,
 )
 from app.schemas.ws import WsEnvelope
+from app.services.community_support import (
+    CommunityResponseFactory,
+    empty_reaction_counts,
+    fallback_username,
+    holding_summaries_from_json,
+    is_profile_username_conflict,
+    non_negative_int,
+    normalize_display_name,
+    normalize_market_bias,
+    normalize_media_reference,
+    normalize_reaction_key,
+    normalize_short_text,
+    normalize_social_accounts,
+    normalize_symbol,
+    normalize_symbols,
+    normalize_username,
+    profile_score,
+    public_media_url,
+)
 from app.services.daily_reward_service import DailyRewardService
 from app.services.membership_tiers import MEMBERSHIP_TIER_LEGEND, MEMBERSHIP_TIER_PRO
 from app.services.notification_service import NotificationService
 from app.services.user_service import ensure_user_exists
 from app.ws.bus import RedisEventBus
 
-_REACTION_KEYS = ("bullish_up", "bearish_down", "laugh", "sad", "cry", "ok", "zor")
 _COMMUNITY_POSTING_OVERRIDE_UID = "esLtkcFW2KfBWFNaWUWwpsbEpuI2"
 
 
@@ -60,6 +78,10 @@ class CommunityService:
         self._daily_rewards = DailyRewardService()
         self._media_root = Path(__file__).resolve().parents[2] / "media"
         self._public_base_url = (public_base_url or "").strip().rstrip("/")
+        self._responses = CommunityResponseFactory(
+            daily_rewards=self._daily_rewards,
+            public_base_url=self._public_base_url,
+        )
 
     async def list_posts(
         self,
@@ -92,13 +114,13 @@ class CommunityService:
                 )
             ).all()
         )
-        normalized_symbol = self._normalize_symbol(symbol)
+        normalized_symbol = normalize_symbol(symbol)
         if normalized_symbol is not None:
             posts = [
                 post
                 for post in posts
                 if post.symbol == normalized_symbol
-                or normalized_symbol in self._normalize_symbols(post.symbols_json)
+                or normalized_symbol in normalize_symbols(post.symbols_json)
             ]
         return await self._serialize_posts(db, posts[:normalized_limit])
 
@@ -188,17 +210,14 @@ class CommunityService:
                 PostReaction.user_id == normalized_user_id,
             )
         )
-        return self._normalize_reaction_key(reaction)
+        return normalize_reaction_key(reaction)
 
     async def get_profile(self, db: AsyncSession, uid: str) -> CommunityProfileResponse:
         user = await db.get(User, uid.strip())
         if user is None:
             raise self._not_found("Profile not found.")
         profile = await db.get(CommunityProfile, user.id)
-        if profile is None:
-            profile = await self._ensure_profile(db, user)
-            await db.commit()
-        return self._profile_response(user, profile)
+        return self._responses.profile_response(user, profile)
 
     async def list_recent_profiles(
         self,
@@ -276,7 +295,7 @@ class CommunityService:
                 for token in tokens
             )
         ]
-        filtered.sort(key=lambda item: self._profile_score(item, tokens), reverse=True)
+        filtered.sort(key=lambda item: profile_score(item, tokens), reverse=True)
         return filtered[: max(1, min(limit, 50))]
 
     async def get_public_holding_summaries(
@@ -288,7 +307,7 @@ class CommunityService:
         user = await db.get(User, uid.strip())
         if user is None:
             raise self._not_found("Profile not found.")
-        summaries = self._holding_summaries_from_json(user.holdings_json)
+        summaries = holding_summaries_from_json(user.holdings_json)
         return {
             symbol: CommunityPublicHoldingSummaryResponse(
                 amount=item["amount"],
@@ -422,7 +441,7 @@ class CommunityService:
                 user_id=normalized_target_uid,
                 kind="community_follow",
                 title="New follower",
-                body=f"{self._normalize_display_name(actor.display_name) or 'XR HODL Member'} followed you.",
+                body=f"{normalize_display_name(actor.display_name) or 'XR HODL Member'} followed you.",
                 actor_uid=actor.id,
                 post_id=None,
             )
@@ -485,14 +504,14 @@ class CommunityService:
                     f"Reward Pro accounts can publish up to {self._daily_rewards.reward_pro_posts_per_day} posts per day."
                 )
 
-        content = self._normalize_short_text(payload.content, max_length=2000)
+        content = normalize_short_text(payload.content, max_length=2000)
         if not content:
             raise self._bad_request("Post content cannot be empty.")
-        symbols = self._normalize_symbols(([payload.symbol] if payload.symbol else []) + payload.symbols)
+        symbols = normalize_symbols(([payload.symbol] if payload.symbol else []) + payload.symbols)
         poll_options = [
             normalized
             for normalized in (
-                self._normalize_short_text(option, max_length=60)
+                normalize_short_text(option, max_length=60)
                 for option in payload.pollOptions[:4]
             )
             if normalized
@@ -507,8 +526,8 @@ class CommunityService:
             content=content,
             symbol=symbols[0] if symbols else None,
             symbols_json=symbols,
-            image_url=self._normalize_media_reference(payload.imageUrl),
-            market_bias=self._normalize_market_bias(payload.marketBias),
+            image_url=normalize_media_reference(payload.imageUrl),
+            market_bias=normalize_market_bias(payload.marketBias),
             poll_options_json=poll_options,
             poll_vote_counts_json=[0 for _ in poll_options],
             poll_vote_total=0,
@@ -540,7 +559,7 @@ class CommunityService:
             raise self._not_found("Post not found.")
         if post.author_id != current_user_id.strip():
             raise self._forbidden("You can only edit your own posts.")
-        content = self._normalize_short_text(payload.content, max_length=2000)
+        content = normalize_short_text(payload.content, max_length=2000)
         if not content:
             raise self._bad_request("Post content cannot be empty.")
         post.content = content
@@ -596,7 +615,7 @@ class CommunityService:
         if post.poll_ends_at is not None and post.poll_ends_at < self._now():
             raise self._bad_request("This poll has ended.")
 
-        counts = [self._non_negative_int(item) for item in post.poll_vote_counts_json]
+        counts = [non_negative_int(item) for item in post.poll_vote_counts_json]
         while len(counts) < len(options):
             counts.append(0)
 
@@ -651,7 +670,7 @@ class CommunityService:
         if existing is not None:
             return
         db.add(PostView(post_id=normalized_post_id, user_id=current_user_id.strip()))
-        post.view_count = self._non_negative_int(post.view_count) + 1
+        post.view_count = non_negative_int(post.view_count) + 1
         post.updated_at = self._now()
         await db.commit()
 
@@ -664,7 +683,7 @@ class CommunityService:
         payload: CommunityAddCommentRequest,
     ) -> CommunityCommentResponse:
         normalized_post_id = post_id.strip()
-        content = self._normalize_short_text(payload.content, max_length=1000)
+        content = normalize_short_text(payload.content, max_length=1000)
         if not normalized_post_id or not content:
             raise self._bad_request("Comment cannot be empty.")
         user = await ensure_user_exists(db, current_user_id)
@@ -677,11 +696,11 @@ class CommunityService:
             post_id=normalized_post_id,
             author_id=user.id,
             reply_to_comment_id=(payload.replyToCommentId or "").strip() or None,
-            reply_to_author_username=self._normalize_username(payload.replyToAuthorUsername or "") or None,
+            reply_to_author_username=normalize_username(payload.replyToAuthorUsername or "") or None,
             content=content,
         )
         db.add(comment)
-        post.comment_count = self._non_negative_int(post.comment_count) + 1
+        post.comment_count = non_negative_int(post.comment_count) + 1
         post.updated_at = self._now()
         await db.commit()
         await db.refresh(comment)
@@ -750,7 +769,7 @@ class CommunityService:
         target_path.write_bytes(raw)
 
         relative_path = f"/media/{category.strip('/')}/{stored_name}"
-        public_url = self._public_media_url(relative_path) or relative_path
+        public_url = public_media_url(relative_path, self._public_base_url) or relative_path
         return CommunityImageUploadResponse(url=public_url, path=relative_path)
 
     async def _upsert_profile(
@@ -764,10 +783,10 @@ class CommunityService:
         user = await ensure_user_exists(db, current_user_id)
         profile = await self._ensure_profile(db, user)
         now = self._now()
-        display_name = self._normalize_display_name(payload.displayName)
+        display_name = normalize_display_name(payload.displayName)
         if not display_name:
             raise self._bad_request("Display name cannot be empty.")
-        username = self._normalize_username(payload.username)
+        username = normalize_username(payload.username)
         if len(username) < 3:
             raise self._bad_request("Username must be at least 3 characters.")
 
@@ -778,20 +797,20 @@ class CommunityService:
             strict=strict_username,
         )
         if profile.display_name != display_name:
-            profile.display_name_change_count = self._non_negative_int(profile.display_name_change_count) + 1
+            profile.display_name_change_count = non_negative_int(profile.display_name_change_count) + 1
             profile.display_name_window_started_at = now
         if profile.username != claimed_username:
             profile.username_updated_at = now
 
         profile.username = claimed_username
         profile.display_name = display_name
-        profile.avatar_url = self._normalize_media_reference(payload.avatarUrl)
-        profile.cover_image_url = self._normalize_media_reference(payload.coverImageUrl)
-        profile.biography = self._normalize_short_text(payload.biography, max_length=160)
-        profile.birthday_label = self._normalize_short_text(payload.birthdayLabel, max_length=24)
-        profile.website = self._normalize_short_text(payload.website, max_length=80)
-        profile.social_accounts_json = self._normalize_social_accounts(payload.socialAccounts)
-        profile.public_watchlist_symbols_json = self._normalize_symbols(payload.publicWatchlistSymbols)
+        profile.avatar_url = normalize_media_reference(payload.avatarUrl)
+        profile.cover_image_url = normalize_media_reference(payload.coverImageUrl)
+        profile.biography = normalize_short_text(payload.biography, max_length=160)
+        profile.birthday_label = normalize_short_text(payload.birthdayLabel, max_length=24)
+        profile.website = normalize_short_text(payload.website, max_length=80)
+        profile.social_accounts_json = normalize_social_accounts(payload.socialAccounts)
+        profile.public_watchlist_symbols_json = normalize_symbols(payload.publicWatchlistSymbols)
         profile.blocked_account_ids_json = sorted(
             {
                 item.strip()
@@ -807,7 +826,7 @@ class CommunityService:
         user.username = claimed_username
         user.updated_at = now
         await db.commit()
-        return self._profile_response(user, profile)
+        return self._responses.profile_response(user, profile)
 
     async def _serialize_posts(
         self,
@@ -829,11 +848,11 @@ class CommunityService:
         }
         counts = await self._load_post_reaction_counts(db, [post.id for post in posts])
         return [
-            self._post_response(
+            self._responses.post_response(
                 post,
                 users.get(post.author_id),
                 profiles.get(post.author_id),
-                counts.get(post.id, self._empty_reaction_counts()),
+                counts.get(post.id, empty_reaction_counts()),
             )
             for post in posts
             if users.get(post.author_id) is not None
@@ -859,7 +878,7 @@ class CommunityService:
         }
         counts = await self._load_comment_reaction_counts(db, [comment.id for comment in comments])
         return [
-            self._comment_response(
+            self._responses.comment_response(
                 comment,
                 users.get(comment.author_id),
                 profiles.get(comment.author_id),
@@ -883,20 +902,16 @@ class CommunityService:
                 await db.scalars(select(CommunityProfile).where(CommunityProfile.uid.in_(user_ids)))
             ).all()
         }
-        out: list[CommunityProfileResponse] = []
-        for user in users:
-            profile = profiles.get(user.id)
-            if profile is None:
-                profile = await self._ensure_profile(db, user)
-            out.append(self._profile_response(user, profile))
-        await db.flush()
-        return out
+        return [
+            self._responses.profile_response(user, profiles.get(user.id))
+            for user in users
+        ]
 
     async def _ensure_profile(self, db: AsyncSession, user: User) -> CommunityProfile:
         existing = await db.get(CommunityProfile, user.id)
         if existing is not None:
             return existing
-        display_name = self._normalize_display_name(user.display_name) or "XR HODL Member"
+        display_name = normalize_display_name(user.display_name) or "XR HODL Member"
         desired_username = user.display_name or user.username or user.id
         values = {
             "uid": user.id,
@@ -931,7 +946,7 @@ class CommunityService:
                 if created is not None:
                     return created
             except IntegrityError as error:
-                if not self._is_profile_username_conflict(error):
+                if not is_profile_username_conflict(error):
                     raise
         raise self._bad_request("Could not reserve a username.")
 
@@ -943,9 +958,9 @@ class CommunityService:
         desired: str,
         strict: bool,
     ) -> str:
-        base = self._normalize_username(desired)
+        base = normalize_username(desired)
         if not base:
-            base = self._fallback_username(uid, uid=uid)
+            base = fallback_username(uid, uid=uid)
         row = await db.scalar(
             select(CommunityProfile.uid).where(
                 CommunityProfile.username == base,
@@ -957,7 +972,7 @@ class CommunityService:
         if strict:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already in use.")
 
-        suffix_seed = self._normalize_username(uid) or uid.lower()
+        suffix_seed = normalize_username(uid) or uid.lower()
         suffix = suffix_seed[:6] or "user"
         for index in range(100):
             suffix_part = suffix if index == 0 else f"{suffix}{index}"
@@ -987,12 +1002,12 @@ class CommunityService:
                 .group_by(PostReaction.post_id, PostReaction.reaction_type)
             )
         ).all()
-        grouped = {post_id: self._empty_reaction_counts() for post_id in post_ids}
+        grouped = {post_id: empty_reaction_counts() for post_id in post_ids}
         for post_id, reaction_type, count in rows:
-            reaction_key = self._normalize_reaction_key(reaction_type)
+            reaction_key = normalize_reaction_key(reaction_type)
             if reaction_key is None:
                 continue
-            grouped.setdefault(post_id, self._empty_reaction_counts())[reaction_key] = int(count)
+            grouped.setdefault(post_id, empty_reaction_counts())[reaction_key] = int(count)
         return grouped
 
     async def _load_comment_reaction_counts(
@@ -1081,309 +1096,8 @@ class CommunityService:
             ).model_dump(mode="json"),
         )
 
-    def _profile_response(self, user: User, profile: CommunityProfile) -> CommunityProfileResponse:
-        username = self._normalize_username(profile.username) or self._fallback_username(
-            profile.display_name or user.display_name or user.id,
-            uid=user.id,
-        )
-        effective_tier = self._daily_rewards.effective_membership_tier_user(user)
-        return CommunityProfileResponse(
-            uid=user.id,
-            displayName=self._normalize_display_name(profile.display_name or user.display_name) or "XR HODL Member",
-            username=username,
-            avatarUrl=self._public_media_url(profile.avatar_url or user.avatar_url),
-            coverImageUrl=self._public_media_url(profile.cover_image_url),
-            avatarUpdatedAt=profile.updated_at if profile.avatar_url else None,
-            coverImageUpdatedAt=profile.updated_at if profile.cover_image_url else None,
-            biography=self._normalize_short_text(profile.biography, max_length=160),
-            birthdayLabel=self._normalize_short_text(profile.birthday_label, max_length=24),
-            website=self._normalize_short_text(profile.website, max_length=80),
-            socialAccounts=self._normalize_social_accounts(dict(profile.social_accounts_json or {})),
-            publicWatchlistSymbols=self._normalize_symbols(profile.public_watchlist_symbols_json),
-            blockedAccountIds=sorted(
-                {
-                    item.strip()
-                    for item in list(profile.blocked_account_ids_json or [])
-                    if str(item).strip()
-                }
-            ),
-            usernameUpdatedAt=profile.username_updated_at,
-            displayNameWindowStartedAt=profile.display_name_window_started_at,
-            displayNameChangeCount=self._non_negative_int(profile.display_name_change_count),
-            membershipTier=effective_tier,
-            isPro=effective_tier != "free",
-        )
-
-    def _post_response(
-        self,
-        post: Post,
-        user: User | None,
-        profile: CommunityProfile | None,
-        reaction_counts: dict[str, int],
-    ) -> CommunityPostResponse:
-        if user is None:
-            raise self._not_found("Profile not found.")
-        author_membership_tier = self._daily_rewards.effective_membership_tier_user(user)
-        profile_username = self._normalize_username(profile.username) if profile is not None else ""
-        author_name = (
-            self._normalize_display_name(profile.display_name)
-            if profile is not None
-            else self._normalize_display_name(user.display_name)
-        ) or "XR HODL Pro"
-        symbols = self._normalize_symbols(post.symbols_json)
-        symbol = self._normalize_symbol(post.symbol) or (symbols[0] if symbols else None)
-        if symbol is not None and symbol not in symbols:
-            symbols = [symbol, *symbols]
-        poll = None
-        poll_options = [self._normalize_short_text(item, max_length=60) for item in list(post.poll_options_json or [])]
-        poll_options = [item for item in poll_options if item]
-        if len(poll_options) >= 2 and post.poll_duration_days is not None:
-            counts = [self._non_negative_int(item) for item in list(post.poll_vote_counts_json or [])]
-            while len(counts) < len(poll_options):
-                counts.append(0)
-            poll = CommunityPollResponse(
-                options=poll_options,
-                voteCounts=counts[: len(poll_options)],
-                totalVotes=self._non_negative_int(post.poll_vote_total),
-                durationDays=self._non_negative_int(post.poll_duration_days),
-                endsAt=post.poll_ends_at,
-            )
-        return CommunityPostResponse(
-            id=post.id,
-            authorUid=post.author_id,
-            authorName=author_name,
-            authorUsername=profile_username or self._fallback_username(author_name, uid=post.author_id),
-            authorAvatarUrl=self._public_media_url(
-                profile.avatar_url if profile is not None and profile.avatar_url else user.avatar_url
-            ),
-            authorMembershipTier=author_membership_tier,
-            authorIsPro=author_membership_tier != "free",
-            content=self._normalize_short_text(post.content, max_length=2000),
-            symbol=symbol,
-            symbols=symbols,
-            imageUrl=self._public_media_url(post.image_url),
-            marketBias=self._normalize_market_bias(post.market_bias),
-            poll=poll,
-            commentCount=self._non_negative_int(post.comment_count),
-            viewCount=self._non_negative_int(post.view_count),
-            reactionCounts=reaction_counts,
-            createdAt=post.created_at,
-        )
-
-    def _comment_response(
-        self,
-        comment: Comment,
-        user: User | None,
-        profile: CommunityProfile | None,
-        reaction_counts: dict[int, int],
-    ) -> CommunityCommentResponse:
-        if user is None:
-            raise self._not_found("Profile not found.")
-        author_name = (
-            self._normalize_display_name(profile.display_name)
-            if profile is not None
-            else self._normalize_display_name(user.display_name)
-        ) or "XR HODL Member"
-        username = (
-            self._normalize_username(profile.username)
-            if profile is not None
-            else self._fallback_username(author_name, uid=user.id)
-        )
-        return CommunityCommentResponse(
-            id=comment.id,
-            postId=comment.post_id,
-            authorUid=comment.author_id,
-            authorName=author_name,
-            authorUsername=username or self._fallback_username(author_name, uid=user.id),
-            authorAvatarUrl=self._public_media_url(
-                profile.avatar_url if profile is not None and profile.avatar_url else user.avatar_url
-            ),
-            replyToCommentId=self._nullable_text(comment.reply_to_comment_id),
-            replyToAuthorUsername=self._nullable_text(comment.reply_to_author_username),
-            content=self._normalize_short_text(comment.content, max_length=1000),
-            createdAt=comment.created_at,
-            reactionCounts={key: value for key, value in reaction_counts.items() if value > 0},
-        )
-
-    def _holding_summaries_from_json(self, raw: object) -> dict[str, dict[str, object]]:
-        holdings = list(raw if isinstance(raw, list) else [])
-        grouped: dict[str, dict[str, object]] = {}
-        for item in holdings:
-            if not isinstance(item, dict):
-                continue
-            symbol = self._normalize_symbol(item.get("symbol"))
-            amount = self._to_float(item.get("amount"))
-            buy_price = self._to_float(item.get("buyPrice"))
-            entry_date = self._parse_datetime(item.get("buyAt")) or self._parse_datetime(item.get("createdAt"))
-            if symbol is None or amount <= 0 or entry_date is None:
-                continue
-            total_cost = amount * buy_price
-            existing = grouped.get(symbol)
-            if existing is None:
-                grouped[symbol] = {"amount": amount, "totalCost": total_cost, "entryDate": entry_date}
-                continue
-            existing["amount"] = float(existing["amount"]) + amount
-            existing["totalCost"] = float(existing["totalCost"]) + total_cost
-            if entry_date < existing["entryDate"]:
-                existing["entryDate"] = entry_date
-        out: dict[str, dict[str, object]] = {}
-        for symbol, item in grouped.items():
-            amount = float(item["amount"])
-            out[symbol] = {
-                "amount": amount,
-                "avgBuyPrice": float(item["totalCost"]) / amount if amount > 0 else 0.0,
-                "entryDate": item["entryDate"],
-            }
-        return out
-
-    def _profile_score(self, profile: CommunityProfileResponse, tokens: list[str]) -> tuple[int, int]:
-        username = profile.username.lower()
-        display_name = profile.displayName.lower()
-        score = 0
-        for token in tokens:
-            if username == token or display_name == token:
-                score += 50
-            elif username.startswith(token) or display_name.startswith(token):
-                score += 22
-            elif token in username or token in display_name:
-                score += 8
-        if profile.membershipTier == MEMBERSHIP_TIER_LEGEND:
-            score += 6
-        elif profile.membershipTier == MEMBERSHIP_TIER_PRO:
-            score += 3
-        elif profile.isPro:
-            score += 1
-        return score, len(display_name)
-
-    def _empty_reaction_counts(self) -> dict[str, int]:
-        return {key: 0 for key in _REACTION_KEYS}
-
-    def _normalize_symbols(self, raw_values: list[object]) -> list[str]:
-        out: list[str] = []
-        seen: set[str] = set()
-        for raw in raw_values:
-            expanded = str(raw or "").replace("#", " ").upper()
-            expanded = expanded.replace("/", " ").replace("|", " ").replace(",", " ")
-            for part in expanded.split():
-                token = "".join(char for char in part if char.isalnum()).strip()
-                if not token or len(token) > 10 or token in seen:
-                    continue
-                seen.add(token)
-                out.append(token)
-                if len(out) >= 6:
-                    return out
-        return out
-
-    def _normalize_symbol(self, raw: object) -> str | None:
-        values = self._normalize_symbols([raw])
-        return values[0] if values else None
-
-    def _normalize_market_bias(self, raw: object) -> str | None:
-        value = str(raw or "").strip().lower()
-        if value in {"bullish", "bearish"}:
-            return value
-        return None
-
-    def _normalize_reaction_key(self, raw: object) -> str | None:
-        value = str(raw or "").strip()
-        return value if value in _REACTION_KEYS else None
-
-    def _normalize_display_name(self, raw: object) -> str:
-        cleaned = " ".join(str(raw or "").strip().split())
-        return cleaned[:32].rstrip()
-
-    def _normalize_username(self, raw: object) -> str:
-        value = "".join(
-            char
-            for char in str(raw or "").strip().lower()
-            if char.isalnum() or char in {"_", "."}
-        )
-        return value[:24]
-
-    def _fallback_username(self, seed: str, *, uid: str) -> str:
-        normalized = self._normalize_username(seed)
-        if normalized:
-            return normalized
-        compact_uid = uid.strip().lower()
-        return compact_uid[:12] if len(compact_uid) > 12 else compact_uid
-
-    def _is_profile_username_conflict(self, error: IntegrityError) -> bool:
-        detail = str(error.orig).lower()
-        return (
-            "community_profiles_username" in detail
-            or "ix_community_profiles_username" in detail
-            or 'key (username)=' in detail
-        )
-
-    def _normalize_short_text(self, raw: object, *, max_length: int) -> str:
-        cleaned = " ".join(str(raw or "").strip().split())
-        return cleaned[:max_length].rstrip()
-
-    def _normalize_social_accounts(self, raw: dict[str, str]) -> dict[str, str]:
-        out: dict[str, str] = {}
-        for key, value in raw.items():
-            normalized_key = key.strip().lower()
-            normalized_value = self._normalize_short_text(value, max_length=64)
-            if normalized_key and normalized_value:
-                out[normalized_key] = normalized_value
-        return out
-
-    def _nullable_text(self, raw: object) -> str | None:
-        value = str(raw or "").strip()
-        return value or None
-
-    def _normalize_media_reference(self, raw: object) -> str | None:
-        value = self._nullable_text(raw)
-        if value is None:
-            return None
-        if value.startswith("/media/"):
-            return value
-        marker = value.find("/media/")
-        if marker >= 0:
-            return value[marker:]
-        return value
-
-    def _public_media_url(self, raw: object) -> str | None:
-        value = self._nullable_text(raw)
-        if value is None:
-            return None
-        if value.startswith("/media/"):
-            return f"{self._public_base_url}{value}" if self._public_base_url else value
-        marker = value.find("/media/")
-        if marker >= 0:
-            relative = value[marker:]
-            return f"{self._public_base_url}{relative}" if self._public_base_url else relative
-        return value
-
-    def _parse_datetime(self, raw: object) -> datetime | None:
-        if raw is None:
-            return None
-        if isinstance(raw, datetime):
-            return raw if raw.tzinfo is not None else raw.replace(tzinfo=timezone.utc)
-        value = str(raw).strip()
-        if not value:
-            return None
-        try:
-            parsed = datetime.fromisoformat(value)
-        except ValueError:
-            return None
-        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
-
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
-
-    def _non_negative_int(self, raw: object) -> int:
-        try:
-            value = int(raw)
-        except (TypeError, ValueError):
-            return 0
-        return value if value > 0 else 0
-
-    def _to_float(self, raw: object) -> float:
-        try:
-            return float(raw)
-        except (TypeError, ValueError):
-            return 0.0
 
     def _bad_request(self, detail: str) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)

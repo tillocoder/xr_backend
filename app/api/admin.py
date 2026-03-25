@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -15,22 +15,18 @@ from app.db.session import get_db
 from app.models.entities import (
     AiProviderConfig,
     AuthSession,
-    Chat,
     Comment,
     CommentReaction,
     CommunityFollow,
-    LearningVideoLesson,
-    Message,
     NewsArticle,
-    NewsArticleTranslation,
     Notification,
     Post,
     PostReaction,
-    PostView,
     PollVote,
     PushToken,
     User,
 )
+from app.schemas.admin_dashboard import AdminOverviewResponse, AdminStatsResponse
 from app.services.ai_provider_config_service import (
     DEFAULT_GEMINI_MODEL,
     MAX_GEMINI_API_KEYS,
@@ -39,95 +35,18 @@ from app.services.ai_provider_config_service import (
     place_gemini_config,
     rebalance_gemini_config_rows,
 )
+from app.services.admin_dashboard_service import AdminDashboardService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _security = HTTPBasic()
-
-_DAY_NAME = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _clamp_int(value: int, *, low: int, high: int) -> int:
-    return max(low, min(int(value), high))
-
-
-def _date_range(end: date, *, days: int) -> list[date]:
-    if days <= 0:
-        return []
-    start = end - timedelta(days=days - 1)
-    return [start + timedelta(days=i) for i in range(days)]
-
-
-def _since_dt_for_days(days: int) -> datetime:
-    end = _utc_now().date()
-    start = end - timedelta(days=days - 1)
-    return datetime(start.year, start.month, start.day, tzinfo=timezone.utc)
-
-
-class AdminTimePoint(BaseModel):
-    date: str
-    value: int
-
-
-class AdminWeeklyEngagementItem(BaseModel):
-    day: str
-    posts: int = 0
-    comments: int = 0
-    messages: int = 0
-
-
-class AdminSentimentItem(BaseModel):
-    name: str
-    value: int
-    color: str
-
-
-class AdminMessageTypeItem(BaseModel):
-    type: str
-    count: int
-    color: str
-
-
-class AdminTopSymbolItem(BaseModel):
-    symbol: str
-    posts: int
-    views: int
-    reactions: int
-    color: str = "#3b82f6"
-
-
-class AdminNamedValueItem(BaseModel):
-    name: str
-    value: int
-    color: str = "#64748b"
-
-
-class AdminKeyMetricItem(BaseModel):
-    label: str
-    value: str
-    pct: int = 0
-
-
-class AdminOverviewResponse(BaseModel):
-    stats: AdminStatsResponse
-    userSeries: list[AdminTimePoint] = Field(default_factory=list)
-    postSeries: list[AdminTimePoint] = Field(default_factory=list)
-    messageSeries: list[AdminTimePoint] = Field(default_factory=list)
-    weeklyEngagement: list[AdminWeeklyEngagementItem] = Field(default_factory=list)
-    sentiment: list[AdminSentimentItem] = Field(default_factory=list)
-    messageTypes: list[AdminMessageTypeItem] = Field(default_factory=list)
-    topSymbols: list[AdminTopSymbolItem] = Field(default_factory=list)
-    platformDistribution: list[AdminNamedValueItem] = Field(default_factory=list)
-    keyMetrics: list[AdminKeyMetricItem] = Field(default_factory=list)
-    updatedAt: datetime = Field(default_factory=_utc_now)
+_admin_dashboard_service = AdminDashboardService()
 
 
 def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> str:
     settings = get_settings()
+    if not settings.admin_features_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
     is_valid_username = secrets.compare_digest(
         credentials.username,
         settings.admin_panel_username,
@@ -143,30 +62,6 @@ def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> st
         detail="Invalid admin credentials.",
         headers={"WWW-Authenticate": "Basic"},
     )
-
-
-class AdminStatsResponse(BaseModel):
-    totalUsers: int = 0
-    freeUsers: int = 0
-    proTierUsers: int = 0
-    legendUsers: int = 0
-    proUsers: int = 0
-    totalPosts: int = 0
-    totalComments: int = 0
-    totalPostViews: int = 0
-    totalMessages: int = 0
-    voiceMessages: int = 0
-    deletedMessages: int = 0
-    totalChats: int = 0
-    activeSessions: int = 0
-    totalLessons: int = 0
-    publishedLessons: int = 0
-    totalNewsArticles: int = 0
-    translatedArticles: int = 0
-    totalNotifications: int = 0
-    totalReactions: int = 0
-    totalFollows: int = 0
-    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AdminUserItem(BaseModel):
@@ -290,99 +185,7 @@ async def get_admin_stats(
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminStatsResponse:
-    now = _utc_now()
-    active_cutoff = now - timedelta(minutes=5)
-
-    async def count(stmt) -> int:
-        return int((await db.execute(stmt)).scalar() or 0)
-
-    total_users = await count(select(func.count(User.id)))
-    free_users = await count(select(func.count(User.id)).where(User.membership_tier == "free"))
-    pro_tier_users = await count(select(func.count(User.id)).where(User.membership_tier == "pro"))
-    legend_users = await count(select(func.count(User.id)).where(User.membership_tier == "legend"))
-    pro_users = await count(select(func.count(User.id)).where(User.is_pro.is_(True)))
-    total_posts = await count(select(func.count(Post.id)))
-    total_comments = await count(select(func.count(Comment.id)))
-    total_post_views = await count(select(func.coalesce(func.sum(Post.view_count), 0)))
-    total_messages = await count(select(func.count(Message.id)))
-    voice_messages = await count(select(func.count(Message.id)).where(Message.message_type == "voice"))
-    deleted_messages = await count(select(func.count(Message.id)).where(Message.deleted_at.is_not(None)))
-    total_chats = await count(select(func.count(Chat.id)))
-    active_sessions = await count(
-        select(func.count(AuthSession.id))
-        .where(AuthSession.access_expires_at > now)
-        .where(AuthSession.last_seen_at >= active_cutoff)
-    )
-    total_lessons = await count(select(func.count(LearningVideoLesson.id)))
-    published_lessons = await count(
-        select(func.count(LearningVideoLesson.id)).where(LearningVideoLesson.is_published.is_(True))
-    )
-    total_news_articles = await count(select(func.count(NewsArticle.id)))
-    translated_articles = await count(select(func.count(NewsArticleTranslation.id)))
-    total_notifications = await count(select(func.count(Notification.id)))
-    total_reactions = (
-        await count(select(func.count(PostReaction.id)))
-        + await count(select(func.count(CommentReaction.id)))
-    )
-    total_follows = await count(select(func.count(CommunityFollow.id)))
-
-    return AdminStatsResponse(
-        totalUsers=total_users,
-        freeUsers=free_users,
-        proTierUsers=pro_tier_users,
-        legendUsers=legend_users,
-        proUsers=pro_users,
-        totalPosts=total_posts,
-        totalComments=total_comments,
-        totalPostViews=total_post_views,
-        totalMessages=total_messages,
-        voiceMessages=voice_messages,
-        deletedMessages=deleted_messages,
-        totalChats=total_chats,
-        activeSessions=active_sessions,
-        totalLessons=total_lessons,
-        publishedLessons=published_lessons,
-        totalNewsArticles=total_news_articles,
-        translatedArticles=translated_articles,
-        totalNotifications=total_notifications,
-        totalReactions=total_reactions,
-        totalFollows=total_follows,
-        updatedAt=now,
-    )
-
-
-async def _count_series_by_day(
-    db: AsyncSession,
-    *,
-    column,
-    from_dt: datetime,
-    days: int,
-) -> list[AdminTimePoint]:
-    end = _utc_now().date()
-    date_list = _date_range(end, days=days)
-    if not date_list:
-        return []
-
-    rows = (
-        await db.execute(
-            select(func.date_trunc("day", column).label("day"), func.count().label("count"))
-            .where(column >= from_dt)
-            .group_by("day")
-            .order_by("day")
-        )
-    ).all()
-    mapping: dict[str, int] = {}
-    for row in rows:
-        day = row.day
-        if day is None:
-            continue
-        key = day.date().isoformat()
-        mapping[key] = int(row.count or 0)
-
-    return [
-        AdminTimePoint(date=d.isoformat(), value=mapping.get(d.isoformat(), 0))
-        for d in date_list
-    ]
+    return await _admin_dashboard_service.get_stats(db)
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -391,212 +194,7 @@ async def get_admin_overview(
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminOverviewResponse:
-    days_clamped = _clamp_int(days, low=1, high=90)
-    from_dt = _since_dt_for_days(days_clamped)
-
-    stats = await get_admin_stats(_, db)
-
-    user_series = await _count_series_by_day(db, column=User.created_at, from_dt=from_dt, days=days_clamped)
-    post_series = await _count_series_by_day(db, column=Post.created_at, from_dt=from_dt, days=days_clamped)
-    message_series = await _count_series_by_day(db, column=Message.created_at, from_dt=from_dt, days=days_clamped)
-
-    week_from_dt = _since_dt_for_days(7)
-    post_week = await _count_series_by_day(db, column=Post.created_at, from_dt=week_from_dt, days=7)
-    comment_week = await _count_series_by_day(db, column=Comment.created_at, from_dt=week_from_dt, days=7)
-    message_week = await _count_series_by_day(db, column=Message.created_at, from_dt=week_from_dt, days=7)
-
-    weekly_engagement: list[AdminWeeklyEngagementItem] = []
-    for i, day in enumerate(_date_range(_utc_now().date(), days=7)):
-        weekly_engagement.append(
-            AdminWeeklyEngagementItem(
-                day=_DAY_NAME[day.weekday()],
-                posts=post_week[i].value if i < len(post_week) else 0,
-                comments=comment_week[i].value if i < len(comment_week) else 0,
-                messages=message_week[i].value if i < len(message_week) else 0,
-            )
-        )
-
-    async def count(stmt) -> int:
-        return int((await db.execute(stmt)).scalar() or 0)
-
-    window_total_posts = await count(select(func.count(Post.id)).where(Post.created_at >= from_dt))
-    bullish = await count(
-        select(func.count(Post.id))
-        .where(Post.created_at >= from_dt)
-        .where(Post.market_bias == "bullish")
-    )
-    bearish = await count(
-        select(func.count(Post.id))
-        .where(Post.created_at >= from_dt)
-        .where(Post.market_bias == "bearish")
-    )
-    neutral = max(0, int(window_total_posts - bullish - bearish))
-
-    sentiment = [
-        AdminSentimentItem(name="Bullish", value=bullish, color="#10b981"),
-        AdminSentimentItem(name="Bearish", value=bearish, color="#ef4444"),
-        AdminSentimentItem(name="Neutral", value=neutral, color="#64748b"),
-    ]
-
-    type_rows = (
-        await db.execute(
-            select(Message.message_type, func.count(Message.id))
-            .group_by(Message.message_type)
-        )
-    ).all()
-    type_counts = {str(t or "text"): int(c or 0) for t, c in type_rows}
-    reply_count = await count(select(func.count(Message.id)).where(Message.reply_to_message_id.is_not(None)))
-
-    message_types = [
-        AdminMessageTypeItem(type="Text", count=type_counts.get("text", 0), color="#3b82f6"),
-        AdminMessageTypeItem(type="Image", count=type_counts.get("image", 0), color="#10b981"),
-        AdminMessageTypeItem(type="Voice", count=type_counts.get("voice", 0), color="#8b5cf6"),
-        AdminMessageTypeItem(type="Reply", count=reply_count, color="#f59e0b"),
-    ]
-
-    posts_expr = func.count(Post.id).label("posts")
-    views_expr = func.coalesce(func.sum(Post.view_count), 0).label("views")
-    reactions_expr = func.count(PostReaction.id).label("reactions")
-
-    symbol_rows = (
-        await db.execute(
-            select(
-                Post.symbol,
-                posts_expr,
-                views_expr,
-                reactions_expr,
-            )
-            .select_from(Post)
-            .outerjoin(PostReaction, PostReaction.post_id == Post.id)
-            .where(Post.created_at >= from_dt)
-            .where(Post.symbol.is_not(None))
-            .where(Post.symbol != "")
-            .group_by(Post.symbol)
-            .order_by(desc(posts_expr))
-            .limit(5)
-        )
-    ).all()
-
-    palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#06b6d4", "#f97316"]
-    top_symbols: list[AdminTopSymbolItem] = []
-    for i, row in enumerate(symbol_rows):
-        top_symbols.append(
-            AdminTopSymbolItem(
-                symbol=str(row.symbol),
-                posts=int(row.posts or 0),
-                views=int(row.views or 0),
-                reactions=int(row.reactions or 0),
-                color=palette[i % len(palette)],
-            )
-        )
-
-    platform_rows = (
-        await db.execute(
-            select(PushToken.platform, func.count(PushToken.token)).group_by(PushToken.platform)
-        )
-    ).all()
-    platform_counts = {str(p or "unknown").lower(): int(c or 0) for p, c in platform_rows}
-    platform_palette = {
-        "ios": "#3b82f6",
-        "android": "#10b981",
-        "web": "#8b5cf6",
-        "unknown": "#64748b",
-        "other": "#64748b",
-    }
-    platform_distribution = [
-        AdminNamedValueItem(name="iOS", value=platform_counts.get("ios", 0), color=platform_palette["ios"]),
-        AdminNamedValueItem(
-            name="Android", value=platform_counts.get("android", 0), color=platform_palette["android"]
-        ),
-        AdminNamedValueItem(name="Web", value=platform_counts.get("web", 0), color=platform_palette["web"]),
-    ]
-    other_value = sum(v for k, v in platform_counts.items() if k not in {"ios", "android", "web"} and v)
-    if other_value:
-        platform_distribution.append(
-            AdminNamedValueItem(name="Other", value=other_value, color=platform_palette["other"])
-        )
-
-    now = _utc_now()
-    day_cutoff = now - timedelta(days=1)
-    active_users_24h = await count(
-        select(func.count(func.distinct(AuthSession.user_id)))
-        .where(AuthSession.access_expires_at > now)
-        .where(AuthSession.last_seen_at >= day_cutoff)
-    )
-
-    avg_session_seconds = float(
-        (
-            await db.execute(
-                select(
-                    func.coalesce(
-                        func.avg(
-                            func.extract("epoch", AuthSession.last_seen_at - AuthSession.created_at)
-                        ),
-                        0,
-                    )
-                )
-                .where(AuthSession.last_seen_at >= from_dt)
-                .where(AuthSession.last_seen_at.is_not(None))
-            )
-        ).scalar()
-        or 0
-    )
-    if avg_session_seconds < 0:
-        avg_session_seconds = 0
-    avg_minutes = int(avg_session_seconds // 60)
-    avg_seconds = int(avg_session_seconds % 60)
-    avg_session_value = f"{avg_minutes}m {avg_seconds:02d}s"
-    avg_session_pct = int(_clamp_int(round((avg_session_seconds / (15 * 60)) * 100), low=0, high=100))
-
-    window_views = await count(select(func.count(PostView.id)).where(PostView.created_at >= from_dt))
-    window_comments = await count(select(func.count(Comment.id)).where(Comment.created_at >= from_dt))
-    window_post_reactions = await count(select(func.count(PostReaction.id)).where(PostReaction.created_at >= from_dt))
-    window_comment_reactions = await count(
-        select(func.count(CommentReaction.id)).where(CommentReaction.created_at >= from_dt)
-    )
-    window_interactions = window_comments + window_post_reactions + window_comment_reactions
-    engagement_rate = (window_interactions / window_views) * 100 if window_views else 0.0
-    engagement_pct = int(_clamp_int(round(engagement_rate), low=0, high=100))
-
-    pro_conversion_rate = (stats.proTierUsers / stats.totalUsers) * 100 if stats.totalUsers else 0.0
-    pro_conversion_pct = int(_clamp_int(round(pro_conversion_rate), low=0, high=100))
-
-    window_notifications = await count(select(func.count(Notification.id)).where(Notification.created_at >= from_dt))
-    window_notifications_read = await count(
-        select(func.count(Notification.id))
-        .where(Notification.created_at >= from_dt)
-        .where(Notification.is_read.is_(True))
-    )
-    notif_read_rate = (window_notifications_read / window_notifications) * 100 if window_notifications else 0.0
-    notif_read_pct = int(_clamp_int(round(notif_read_rate), low=0, high=100))
-
-    dau_pct = (
-        int(_clamp_int(round((active_users_24h / stats.totalUsers) * 100), low=0, high=100))
-        if stats.totalUsers
-        else 0
-    )
-
-    key_metrics = [
-        AdminKeyMetricItem(label="Daily Active Users", value=f"{active_users_24h:,}", pct=dau_pct),
-        AdminKeyMetricItem(label="Avg Session Duration", value=avg_session_value, pct=avg_session_pct),
-        AdminKeyMetricItem(label="Post Engagement Rate", value=f"{engagement_rate:.1f}%", pct=engagement_pct),
-        AdminKeyMetricItem(label="PRO Conversion Rate", value=f"{pro_conversion_rate:.1f}%", pct=pro_conversion_pct),
-        AdminKeyMetricItem(label="Notification Read Rate", value=f"{notif_read_rate:.1f}%", pct=notif_read_pct),
-    ]
-
-    return AdminOverviewResponse(
-        stats=stats,
-        userSeries=user_series,
-        postSeries=post_series,
-        messageSeries=message_series,
-        weeklyEngagement=weekly_engagement,
-        sentiment=sentiment,
-        messageTypes=message_types,
-        topSymbols=top_symbols,
-        platformDistribution=platform_distribution,
-        keyMetrics=key_metrics,
-        updatedAt=_utc_now(),
-    )
+    return await _admin_dashboard_service.get_overview(db, days=days)
 
 
 @router.get("/users", response_model=AdminUserListResponse)

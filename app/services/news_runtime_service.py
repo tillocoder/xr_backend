@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -10,15 +11,17 @@ from app.db.session import SessionLocal
 from app.models.entities import PushToken, User
 from app.schemas.ws import WsEnvelope
 from app.services.firebase_push_service import FirebasePushService
-from app.services.news_feed_service import (
+from app.services.news_query_service import (
     StoredNewsEntry,
     load_pending_notification_entries,
     mark_news_entries_notified,
-    run_news_pipeline,
     squash_pending_notification_backlog,
 )
+from app.services.news_release_service import run_news_pipeline
 from app.services.push_token_service import PushTokenService
 from app.ws.bus import RedisEventBus
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
@@ -40,7 +43,7 @@ class NewsRuntimeService:
         bus: RedisEventBus,
         firebase_push_service: FirebasePushService,
         push_token_service: PushTokenService,
-        poll_interval_seconds: int = 60 * 60,
+        poll_interval_seconds: int = 30 * 60,
         max_notifications_per_cycle: int = 1,
     ) -> None:
         self._bus = bus
@@ -68,8 +71,8 @@ class NewsRuntimeService:
     async def _run_loop(self) -> None:
         try:
             while True:
-                await asyncio.sleep(self._poll_interval_seconds)
                 await self._refresh_once()
+                await asyncio.sleep(self._poll_interval_seconds)
         except asyncio.CancelledError:
             raise
 
@@ -88,6 +91,7 @@ class NewsRuntimeService:
                 )
             except Exception:
                 await db.rollback()
+                logger.exception("news_runtime_cycle_failed")
                 return
 
             sent_article_ids: list[int] = []
@@ -96,6 +100,10 @@ class NewsRuntimeService:
                     await self._publish_update(entry)
                     await self._push_update(entry)
                 except Exception:
+                    logger.exception(
+                        "news_runtime_delivery_failed",
+                        extra={"article_id": entry.article_id, "source": entry.source},
+                    )
                     continue
                 sent_article_ids.append(entry.article_id)
 
@@ -156,7 +164,7 @@ class NewsRuntimeService:
             for start in range(0, len(tokens), 500):
                 chunk = tokens[start : start + 500]
                 invalid_tokens.extend(
-                    self._firebase_push.send_to_tokens(
+                    await self._firebase_push.send_to_tokens(
                         tokens=chunk,
                         title=title,
                         body=body,

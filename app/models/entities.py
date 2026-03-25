@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -362,6 +363,8 @@ class NewsArticle(Base):
     raw_title: Mapped[str] = mapped_column(String(512), nullable=False)
     raw_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     image_url: Mapped[str | None] = mapped_column(String(1024))
+    images_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    content_blocks_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -387,7 +390,90 @@ class NewsArticleTranslation(Base):
     lang: Mapped[str] = mapped_column(String(8), nullable=False)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content_blocks_json: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     model: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MarketCoin(Base):
+    __tablename__ = "market_coins"
+    __table_args__ = (
+        Index("ix_market_coins_symbol", "symbol"),
+        Index("ix_market_coins_rank", "market_cap_rank"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(24), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(1024))
+    market_cap_rank: Mapped[int | None] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MarketPricePoint(Base):
+    __tablename__ = "market_price_points"
+    __table_args__ = (
+        Index("ix_market_price_points_coin_captured_at", "coin_id", "captured_at"),
+        Index("ix_market_price_points_captured_at", "captured_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    coin_id: Mapped[str] = mapped_column(ForeignKey("market_coins.id"), index=True)
+    price_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    change_24h: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    quote_volume_usd: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    market_cap_usd: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    source: Mapped[str] = mapped_column(String(24), default="coingecko", nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class UserTargetAlert(Base):
+    __tablename__ = "user_target_alerts"
+    __table_args__ = (
+        Index("ix_user_target_alerts_user_active", "user_id", "is_active"),
+        Index("ix_user_target_alerts_coin_active", "coin_id", "is_active"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    coin_id: Mapped[str] = mapped_column(ForeignKey("market_coins.id"), index=True)
+    symbol: Mapped[str] = mapped_column(String(24), nullable=False)
+    target_price: Mapped[float] = mapped_column(Float, nullable=False)
+    direction: Mapped[str] = mapped_column(String(12), default="above", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MarketAlertEvent(Base):
+    __tablename__ = "market_alert_events"
+    __table_args__ = (
+        Index("ix_market_alert_events_kind_created", "kind", "created_at"),
+        Index("ix_market_alert_events_dedupe", "dedupe_key", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    coin_id: Mapped[str | None] = mapped_column(ForeignKey("market_coins.id"), index=True)
+    dedupe_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    body: Mapped[str] = mapped_column(String(400), nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

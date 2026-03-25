@@ -359,6 +359,8 @@ class NewsArticleTranslationAdmin(ModelView, model=NewsArticleTranslation):
 
 def setup_admin_panel(app: FastAPI) -> Admin:
     settings = get_settings()
+    if not settings.admin_features_enabled:
+        raise RuntimeError("Admin panel is disabled or configured with insecure credentials.")
     engine = create_engine(_to_sync_database_url(settings.database_url), pool_pre_ping=True)
 
     auth_backend = _AdminAuth(secret_key=settings.admin_panel_secret_key)

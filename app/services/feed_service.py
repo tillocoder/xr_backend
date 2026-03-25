@@ -70,15 +70,25 @@ async def load_feed_page(
     )
     following_author_ids = {author_id for (author_id,) in following_result.all()}
 
+    reaction_counts_by_post = await cache.get_post_reaction_counts_many(post_ids)
+    missing_reaction_post_ids = [
+        post_id for post_id in post_ids if post_id not in reaction_counts_by_post
+    ]
+    if missing_reaction_post_ids:
+        loaded_reaction_counts = await _load_reaction_counts_map_from_db(db, missing_reaction_post_ids)
+        reaction_counts_by_post.update(loaded_reaction_counts)
+        for post_id in missing_reaction_post_ids:
+            await cache.set_post_reaction_counts(
+                post_id,
+                loaded_reaction_counts.get(post_id, {}),
+            )
+
     items: list[FeedItem] = []
     for post in visible_posts:
         author = authors.get(post.author_id)
         if author is None:
             continue
-        reaction_counts = await cache.get_post_reaction_counts(post.id)
-        if reaction_counts is None:
-            reaction_counts = await _load_reaction_counts_from_db(db, post.id)
-            await cache.set_post_reaction_counts(post.id, reaction_counts)
+        reaction_counts = reaction_counts_by_post.get(post.id, {})
 
         items.append(
             FeedItem(
@@ -112,9 +122,22 @@ async def load_feed_page(
 
 
 async def _load_reaction_counts_from_db(db: AsyncSession, post_id: str) -> dict[str, int]:
+    return (await _load_reaction_counts_map_from_db(db, [post_id])).get(post_id, {})
+
+
+async def _load_reaction_counts_map_from_db(
+    db: AsyncSession,
+    post_ids: list[str],
+) -> dict[str, dict[str, int]]:
+    normalized_post_ids = [post_id for post_id in post_ids if post_id]
+    if not normalized_post_ids:
+        return {}
     result = await db.execute(
-        select(PostReaction.reaction_type, func.count(PostReaction.id))
-        .where(PostReaction.post_id == post_id)
-        .group_by(PostReaction.reaction_type)
+        select(PostReaction.post_id, PostReaction.reaction_type, func.count(PostReaction.id))
+        .where(PostReaction.post_id.in_(normalized_post_ids))
+        .group_by(PostReaction.post_id, PostReaction.reaction_type)
     )
-    return {reaction_type: count for reaction_type, count in result.all()}
+    grouped = {post_id: {} for post_id in normalized_post_ids}
+    for post_id, reaction_type, count in result.all():
+        grouped.setdefault(post_id, {})[reaction_type] = count
+    return grouped

@@ -81,6 +81,37 @@ class ObservabilityMiddleware:
             )
 
 
+class SecurityHeadersMiddleware:
+    def __init__(self, app: ASGIApp, *, settings: Settings) -> None:
+        self._app = app
+        self._settings = settings
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self._settings.security_headers_enabled:
+            await self._app(scope, receive, send)
+            return
+
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.setdefault("X-Content-Type-Options", "nosniff")
+                headers.setdefault("X-Frame-Options", "DENY")
+                headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+                headers.setdefault(
+                    "Permissions-Policy",
+                    "camera=(), microphone=(), geolocation=()",
+                )
+                headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+                if _request_is_https(scope):
+                    headers.setdefault(
+                        "Strict-Transport-Security",
+                        "max-age=31536000; includeSubDomains",
+                    )
+            await send(message)
+
+        await self._app(scope, receive, send_wrapper)
+
+
 class RateLimitMiddleware:
     def __init__(
         self,
@@ -92,7 +123,7 @@ class RateLimitMiddleware:
         self._app = app
         self._settings = settings
         self._limiter = limiter
-        self._skipped_prefixes = ("/health", "/ready", "/metrics", "/media", "/admin-panel")
+        self._skipped_prefixes = ("/health", "/ready", "/metrics", "/media")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         limiter = self._limiter
@@ -164,3 +195,14 @@ def _user_key_from_headers(headers: Headers) -> str:
     if user_id:
         return hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:24]
     return ""
+
+
+def _request_is_https(scope: Scope) -> bool:
+    headers = Headers(scope=scope)
+    forwarded_proto = headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    if forwarded_proto in {"https", "wss"}:
+        return True
+    cf_visitor = headers.get("cf-visitor", "").lower()
+    if '"scheme":"https"' in cf_visitor:
+        return True
+    return str(scope.get("scheme", "")).lower() == "https"

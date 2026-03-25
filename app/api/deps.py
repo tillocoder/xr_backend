@@ -7,6 +7,7 @@ from app.application.system.services import SystemStatusService
 from app.bootstrap.container import AppContainer
 from app.core.config import Settings
 from app.db.session import SessionLocal, get_db
+from app.presentation.api.request_state import get_auth_session_service
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
 
@@ -33,12 +34,15 @@ async def get_current_user(
 ) -> CurrentUser:
     token = _bearer_token(authorization)
     if token:
-        session_service: AuthSessionService = request.app.state.auth_session_service
+        session_service: AuthSessionService = get_auth_session_service(request)
         user = await session_service.get_user_for_access_token(db, token)
         if user is None:
             raise HTTPException(status_code=401, detail="Session expired.")
         return CurrentUser(id=user.id)
-    if x_user_id and x_user_id.strip():
+    allow_insecure_demo_auth = bool(
+        getattr(request.app.state.settings, "allow_insecure_demo_auth", False)
+    )
+    if allow_insecure_demo_auth and x_user_id and x_user_id.strip():
         return CurrentUser(id=x_user_id.strip())
     raise HTTPException(status_code=401, detail="Authorization header is required.")
 
@@ -55,8 +59,11 @@ async def get_ws_user(ws: WebSocket) -> CurrentUser:
                 return CurrentUser(id=user.id)
         await ws.close(code=4401)
         raise HTTPException(status_code=401, detail="Session expired.")
+    allow_insecure_demo_auth = bool(
+        getattr(ws.app.state.settings, "allow_insecure_demo_ws_user_id_auth", False)
+    )
     user_id = ws.query_params.get("user_id", "").strip()
-    if user_id:
+    if allow_insecure_demo_auth and user_id:
         return CurrentUser(id=user_id)
     await ws.close(code=4401)
     raise HTTPException(status_code=401, detail="Missing websocket authentication.")

@@ -112,6 +112,30 @@ async def ensure_runtime_tables(connection) -> None:
     await connection.execute(
         text(
             """
+            ALTER TABLE news_articles
+            ADD COLUMN IF NOT EXISTS images_json JSONB NOT NULL DEFAULT '[]'::jsonb
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            ALTER TABLE news_articles
+            ADD COLUMN IF NOT EXISTS content_blocks_json JSONB NOT NULL DEFAULT '[]'::jsonb
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            ALTER TABLE news_article_translations
+            ADD COLUMN IF NOT EXISTS content_blocks_json JSONB NOT NULL DEFAULT '[]'::jsonb
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
             CREATE INDEX IF NOT EXISTS ix_news_articles_released_at_notified_at
             ON news_articles (released_at, notified_at)
             """
@@ -184,5 +208,115 @@ async def ensure_runtime_tables(connection) -> None:
     await connection.execute(
         text(
             "CREATE INDEX IF NOT EXISTS ix_auth_sessions_refresh_token_hash ON auth_sessions (refresh_token_hash)"
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_posts_author_created_at
+            ON posts (author_id, created_at DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS market_coins (
+                id VARCHAR(64) PRIMARY KEY,
+                symbol VARCHAR(24) NOT NULL,
+                name VARCHAR(120) NOT NULL,
+                image_url VARCHAR(1024) NULL,
+                market_cap_rank INTEGER NULL,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS market_price_points (
+                id BIGSERIAL PRIMARY KEY,
+                coin_id VARCHAR(64) NOT NULL REFERENCES market_coins(id),
+                price_usd DOUBLE PRECISION NOT NULL,
+                change_24h DOUBLE PRECISION NOT NULL DEFAULT 0,
+                quote_volume_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+                market_cap_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+                source VARCHAR(24) NOT NULL DEFAULT 'coingecko',
+                captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS user_target_alerts (
+                id VARCHAR(32) PRIMARY KEY,
+                user_id VARCHAR(32) NOT NULL REFERENCES users(id),
+                coin_id VARCHAR(64) NOT NULL REFERENCES market_coins(id),
+                symbol VARCHAR(24) NOT NULL,
+                target_price DOUBLE PRECISION NOT NULL,
+                direction VARCHAR(12) NOT NULL DEFAULT 'above',
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                last_triggered_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS market_alert_events (
+                id VARCHAR(32) PRIMARY KEY,
+                kind VARCHAR(32) NOT NULL,
+                coin_id VARCHAR(64) NULL REFERENCES market_coins(id),
+                dedupe_key VARCHAR(160) NOT NULL,
+                title VARCHAR(180) NOT NULL,
+                body VARCHAR(400) NOT NULL,
+                payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    await connection.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_market_coins_symbol ON market_coins (symbol)")
+    )
+    await connection.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_market_coins_rank ON market_coins (market_cap_rank)")
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_market_price_points_coin_captured_at ON market_price_points (coin_id, captured_at)"
+        )
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_market_price_points_captured_at ON market_price_points (captured_at)"
+        )
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_user_target_alerts_user_active ON user_target_alerts (user_id, is_active)"
+        )
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_user_target_alerts_coin_active ON user_target_alerts (coin_id, is_active)"
+        )
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_market_alert_events_kind_created ON market_alert_events (kind, created_at)"
+        )
+    )
+    await connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_market_alert_events_dedupe ON market_alert_events (dedupe_key, created_at)"
         )
     )
