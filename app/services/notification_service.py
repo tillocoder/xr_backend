@@ -382,7 +382,7 @@ class NotificationService:
                     if value is not None
                 }
             )
-        invalid_tokens = self._firebase_push.send_to_tokens(
+        invalid_tokens = await self._firebase_push.send_to_tokens(
             tokens=tokens,
             title=title,
             body=body,

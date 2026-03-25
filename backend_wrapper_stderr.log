@@ -1,0 +1,24 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+{"timestamp": "2026-03-25T12:15:37.383515+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Started server process [10136]"}
+{"timestamp": "2026-03-25T12:15:37.388574+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Waiting for application startup."}
+{"timestamp": "2026-03-25T12:15:37.576293+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Application startup complete."}
+{"timestamp": "2026-03-25T12:15:37.581836+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"}
+{"timestamp": "2026-03-25T12:15:47.861008+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:50823 - \"GET /api/v1/health HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:15:47.863112+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "7e1df2af9cbd4ab09c63adde67f305ae", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 2.38, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-25T12:16:11.840645+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:62578 - \"GET /api/v1/health HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:16:11.841960+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "8fe65fe711ad430985aad986743d5d10", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 480.72, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-25T12:16:41.623985+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:62602 - \"GET /api/v1/news/feed?limit=30&lang=en HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:16:41.628448+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "b63de27df17a4389b77ce0f2020a182a", "method": "GET", "path": "/api/v1/news/feed", "route": "/api/v1/news/feed", "statusCode": 200, "durationMs": 488.09, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-25T12:16:42.592382+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:62605 - \"GET /api/v1/news/feed?limit=30&lang=uz HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:16:42.595135+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "e8af0f8dd7e844f7aad9b96f286922bc", "method": "GET", "path": "/api/v1/news/feed", "route": "/api/v1/news/feed", "statusCode": 200, "durationMs": 1245.12, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-25T12:16:57.207480+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "144.124.199.175:0 - \"POST /api/v1/news/read HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:16:57.208706+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "64492f256cb244daa04af91b398b58c6", "method": "POST", "path": "/api/v1/news/read", "route": "/api/v1/news/read", "statusCode": 200, "durationMs": 369.75, "clientIp": "144.124.199.175"}
+{"timestamp": "2026-03-25T12:16:58.447906+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "144.124.199.175:0 - \"GET /api/v1/health HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:16:58.449987+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "a1fe5f55d1b4460db986937dd6bde13c", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 2.66, "clientIp": "144.124.199.175"}
+{"timestamp": "2026-03-25T12:17:32.270130+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "144.124.199.175:0 - \"POST /api/v1/me/notifications/read-all HTTP/1.1\" 204"}
+{"timestamp": "2026-03-25T12:17:32.271068+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "3e63ef8188f44eb88d013b1967f9ee98", "method": "POST", "path": "/api/v1/me/notifications/read-all", "route": "/api/v1/me/notifications/read-all", "statusCode": 204, "durationMs": 27.37, "clientIp": "144.124.199.175"}
+{"timestamp": "2026-03-25T12:17:52.635419+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "144.124.199.175:0 - \"GET /api/v1/home/overview?news_limit=18&lang=uz HTTP/1.1\" 200"}
+{"timestamp": "2026-03-25T12:17:52.636433+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "d8aba368e3e347c3b2c9a71f52272c96", "method": "GET", "path": "/api/v1/home/overview", "route": "/api/v1/home/overview", "statusCode": 200, "durationMs": 495.65, "clientIp": "144.124.199.175"}

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.presentation.api.json_cache import JsonRouteCache
+from app.presentation.api.request_state import get_notification_service
 from app.schemas.learning import (
     AdminLearningVideoLessonResponse,
     LearningVideoLessonResponse,
@@ -23,10 +25,19 @@ admin_router = APIRouter(prefix="/admin/learning", tags=["admin-learning"])
 
 _security = HTTPBasic()
 _learning_service = LearningService()
+_PUBLIC_LEARNING_VIDEO_CACHE = JsonRouteCache(
+    namespace="learning:videos:v1",
+    ttl_setting_name="learning_public_cache_ttl_seconds",
+    default_ttl_seconds=75,
+    min_ttl_seconds=20,
+    max_ttl_seconds=180,
+)
 
 
 def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> str:
     settings = get_settings()
+    if not settings.admin_features_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
     is_valid_username = secrets.compare_digest(
         credentials.username,
         settings.admin_panel_username,
@@ -46,9 +57,16 @@ def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> st
 
 @router.get("/videos", response_model=list[LearningVideoLessonResponse])
 async def get_learning_videos(
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> list[LearningVideoLessonResponse]:
-    return await _learning_service.list_published_video_lessons(db)
+    cache_key = _PUBLIC_LEARNING_VIDEO_CACHE.build_key("published")
+    cached = await _PUBLIC_LEARNING_VIDEO_CACHE.get(request, cache_key)
+    if cached is not None:
+        return cached
+    payload = await _learning_service.list_published_video_lessons(db)
+    await _PUBLIC_LEARNING_VIDEO_CACHE.set(request, cache_key, payload)
+    return payload
 
 
 @admin_router.get("", response_class=HTMLResponse)
@@ -164,7 +182,7 @@ def _queue_learning_video_notification(
     if len(body) > 160:
         body = f"{body[:160].rstrip()}..."
 
-    request.app.state.notification_service.queue_broadcast_notification(
+    get_notification_service(request).queue_broadcast_notification(
         kind="learning_video",
         title="New learning video",
         body=f"{lesson.title}: {body}",

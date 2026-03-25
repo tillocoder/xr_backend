@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from starlette.datastructures import Headers
 
 from app.db.session import SessionLocal
 from app.core.public_url import get_public_base_url_for_websocket
+from app.infrastructure.rate_limit.service import RedisRateLimiter
 from app.schemas.community import CommunityImageUploadRequest
 from app.services.chat_service import (
     delete_direct_chat_for_user,
@@ -32,6 +34,8 @@ async def websocket_endpoint(
 ):
     manager = ws.app.state.ws_manager
     settings = ws.app.state.settings
+    if not await _allow_ws_connect(ws, user.id):
+        return
     await manager.connect_user(user.id, ws)
     await ws.app.state.bus.publish(
         f"presence:{user.id}",
@@ -45,6 +49,8 @@ async def websocket_endpoint(
     try:
         while True:
             message = await ws.receive_json()
+            if not await _allow_ws_message(ws, user.id):
+                return
             action = message.get("action")
 
             if action == "subscribe_chat":
@@ -63,6 +69,7 @@ async def websocket_endpoint(
                 if topic:
                     manager.subscribe_topic(topic, ws)
                     await ws.send_json({"type": "subscribed", "topic": topic})
+                    await _send_topic_snapshot(ws, topic)
 
             elif action == "unsubscribe_topic":
                 topic = str(message.get("topic", "")).strip()
@@ -374,6 +381,91 @@ async def _handle_chat_delete_conversation(
     )
 
 
+async def _allow_ws_connect(ws: WebSocket, user_id: str) -> bool:
+    settings = ws.app.state.settings
+    if not getattr(settings, "websocket_rate_limit_enabled", False):
+        return True
+    limiter = getattr(ws.app.state.container, "rate_limiter", None)
+    if not isinstance(limiter, RedisRateLimiter):
+        return True
+
+    ip = _ws_client_ip(ws)
+    ip_decision = await limiter.check(
+        key=f"ratelimit:ws:connect:ip:{ip}",
+        limit=settings.websocket_rate_limit_max_connects_per_ip,
+    )
+    if not ip_decision.allowed:
+        await ws.close(code=4408, reason="Too many websocket connection attempts.")
+        return False
+    return True
+
+
+async def _allow_ws_message(ws: WebSocket, user_id: str) -> bool:
+    settings = ws.app.state.settings
+    if not getattr(settings, "websocket_rate_limit_enabled", False):
+        return True
+    limiter = getattr(ws.app.state.container, "rate_limiter", None)
+    if not isinstance(limiter, RedisRateLimiter):
+        return True
+
+    ip = _ws_client_ip(ws)
+    ip_decision = await limiter.check(
+        key=f"ratelimit:ws:message:ip:{ip}",
+        limit=settings.websocket_rate_limit_max_messages_per_ip,
+    )
+    if not ip_decision.allowed:
+        await ws.send_json(
+            {
+                "type": "error",
+                "topic": "system",
+                "data": {
+                    "message": "Too many websocket messages from this IP.",
+                    "retryAfter": ip_decision.retry_after_seconds,
+                },
+            }
+        )
+        await ws.close(code=4408, reason="Too many websocket messages from this IP.")
+        return False
+
+    user_decision = await limiter.check(
+        key=f"ratelimit:ws:message:user:{user_id}",
+        limit=settings.websocket_rate_limit_max_messages_per_user,
+    )
+    if not user_decision.allowed:
+        await ws.send_json(
+            {
+                "type": "error",
+                "topic": "system",
+                "data": {
+                    "message": "Too many websocket messages for this user.",
+                    "retryAfter": user_decision.retry_after_seconds,
+                },
+            }
+        )
+        await ws.close(code=4408, reason="Too many websocket messages for this user.")
+        return False
+    return True
+
+
+async def _send_topic_snapshot(ws: WebSocket, topic: str) -> None:
+    if not topic.startswith("presence:"):
+        return
+    peer_id = topic.split(":", 1)[1].strip()
+    if not peer_id:
+        return
+    manager = ws.app.state.ws_manager
+    await ws.send_json(
+        WsEnvelope(
+            type="chat.presence",
+            topic=topic,
+            data={
+                "user_id": peer_id,
+                "is_online": manager.is_user_online(peer_id),
+            },
+        ).model_dump(mode="json")
+    )
+
+
 async def _send_command_error(ws: WebSocket, request_id: str, message: str) -> None:
     await ws.send_json(
         {
@@ -383,3 +475,14 @@ async def _send_command_error(ws: WebSocket, request_id: str, message: str) -> N
             "data": {"message": message},
         }
     )
+
+
+def _ws_client_ip(ws: WebSocket) -> str:
+    headers = Headers(scope=ws.scope)
+    forwarded_for = headers.get("x-forwarded-for", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    client = ws.client
+    if client is not None:
+        return str(client.host)
+    return "unknown"

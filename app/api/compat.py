@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -10,8 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.entities import User
+from app.presentation.api.request_state import (
+    get_auth_session_service,
+    get_optional_cache,
+    get_settings_value,
+)
 from app.services.auth_session_service import AuthSessionService
-from app.services.news_feed_service import (
+from app.services.news_query_service import (
+    build_news_cache_revision,
     build_news_feed_payload,
     build_news_list_payload,
     record_news_view,
@@ -21,6 +28,7 @@ from app.services.user_service import ensure_user_exists
 
 
 router = APIRouter(tags=["compat"])
+_PROCESS_NEWS_PAYLOAD_CACHE: dict[str, tuple[float, str, dict[str, object]]] = {}
 
 
 class GoogleAuthIn(BaseModel):
@@ -53,8 +61,81 @@ def _make_uid(email: str | None, id_token: str) -> str:
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:32]
 
 
+def _make_news_etag(*parts: object) -> str:
+    seed = "|".join(str(part or "").strip() for part in parts)
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
+    return f'W/"{digest}"'
+
+
+def _normalize_etag(value: str) -> str:
+    normalized = (value or "").strip()
+    if normalized.startswith("W/"):
+        normalized = normalized[2:].strip()
+    return normalized
+
+
+def _etag_matches(request_etag: str | None, current_etag: str) -> bool:
+    if not request_etag:
+        return False
+    current = _normalize_etag(current_etag)
+    for candidate in request_etag.split(","):
+        token = candidate.strip()
+        if token == "*":
+            return True
+        if _normalize_etag(token) == current:
+            return True
+    return False
+
+
+def _set_news_cache_headers(request: Request, response: Response, *, etag: str) -> None:
+    ttl_seconds = max(30, int(get_settings_value(request, "news_cache_ttl_seconds", 120)))
+    max_age = min(45, ttl_seconds)
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = (
+        f"private, max-age={max_age}, stale-while-revalidate={ttl_seconds}"
+    )
+    response.headers["Vary"] = "Accept-Encoding, If-None-Match"
+
+
+def _not_modified_response(response: Response) -> Response:
+    return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=dict(response.headers))
+
+
+def _process_news_cache_ttl_seconds(request: Request) -> int:
+    configured_ttl = max(
+        15,
+        int(get_settings_value(request, "news_cache_ttl_seconds", 120)),
+    )
+    return min(30, configured_ttl)
+
+
+def _get_process_news_payload(
+    request: Request,
+    key: str,
+) -> tuple[str, dict[str, object]] | None:
+    cached = _PROCESS_NEWS_PAYLOAD_CACHE.get(key)
+    if cached is None:
+        return None
+    expires_at, etag, payload = cached
+    if time.monotonic() >= expires_at:
+        _PROCESS_NEWS_PAYLOAD_CACHE.pop(key, None)
+        return None
+    return etag, payload
+
+
+def _set_process_news_payload(
+    request: Request,
+    key: str,
+    *,
+    etag: str,
+    payload: dict[str, object],
+) -> None:
+    expires_at = time.monotonic() + _process_news_cache_ttl_seconds(request)
+    _PROCESS_NEWS_PAYLOAD_CACHE[key] = (expires_at, etag, payload)
+
+
 async def _get_cached_payload(request: Request, key: str) -> dict[str, object] | None:
-    cache = getattr(request.app.state, "cache", None)
+    cache = get_optional_cache(request)
     if cache is None:
         return None
     payload = await cache.get_json(key)
@@ -64,10 +145,10 @@ async def _get_cached_payload(request: Request, key: str) -> dict[str, object] |
 
 
 async def _set_cached_payload(request: Request, key: str, payload: dict[str, object]) -> None:
-    cache = getattr(request.app.state, "cache", None)
+    cache = get_optional_cache(request)
     if cache is None:
         return
-    ttl_seconds = max(30, int(getattr(request.app.state.settings, "news_cache_ttl_seconds", 120)))
+    ttl_seconds = max(30, int(get_settings_value(request, "news_cache_ttl_seconds", 120)))
     await cache.set_json(key, payload, ttl_seconds=ttl_seconds)
 
 
@@ -83,7 +164,7 @@ async def _get_session_payload(
             token = parts[1].strip()
     if not token:
         raise HTTPException(status_code=401, detail="Missing bearer token.")
-    session_service: AuthSessionService = request.app.state.auth_session_service
+    session_service: AuthSessionService = get_auth_session_service(request)
     user = await session_service.get_user_for_access_token(db, token)
     if user is None:
         raise HTTPException(status_code=401, detail="Session expired.")
@@ -202,7 +283,7 @@ async def auth_google(
         "display_name": display_name,
         "photo_url": photo_url,
     }
-    auth_session_service: AuthSessionService = request.app.state.auth_session_service
+    auth_session_service: AuthSessionService = get_auth_session_service(request)
     session = await auth_session_service.issue_session(db, user_id=user_id)
     return {
         "accessToken": session.access_token,
@@ -227,7 +308,7 @@ async def auth_refresh(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    auth_session_service: AuthSessionService = request.app.state.auth_session_service
+    auth_session_service: AuthSessionService = get_auth_session_service(request)
     refreshed = await auth_session_service.refresh_session(db, payload.refreshToken)
     if refreshed is None:
         raise HTTPException(status_code=401, detail="Refresh token expired.")
@@ -260,7 +341,7 @@ async def auth_logout(
         if len(parts) == 2 and parts[0].lower() == "bearer":
             token = parts[1].strip()
     if token:
-        auth_session_service: AuthSessionService = request.app.state.auth_session_service
+        auth_session_service: AuthSessionService = get_auth_session_service(request)
         await auth_session_service.revoke_access_token(db, token)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -277,7 +358,7 @@ async def delete_account(
         if len(parts) == 2 and parts[0].lower() == "bearer":
             token = parts[1].strip()
     if token:
-        auth_session_service: AuthSessionService = request.app.state.auth_session_service
+        auth_session_service: AuthSessionService = get_auth_session_service(request)
         await auth_session_service.revoke_access_token(db, token)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -285,40 +366,94 @@ async def delete_account(
 @router.get("/news/feed")
 async def news_feed(
     request: Request,
-    limit: int = 12,
+    response: Response,
+    limit: int = 18,
     lang: str = "en",
+    if_none_match: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     normalized_limit = max(1, min(limit, 20))
-    cache_key = f"news:feed:{lang.lower()}:{normalized_limit}"
+    process_cache_key = f"news:feed:v4:{lang.lower()}:{normalized_limit}"
+    process_cached = _get_process_news_payload(request, process_cache_key)
+    if process_cached is not None:
+        etag, payload = process_cached
+        _set_news_cache_headers(request, response, etag=etag)
+        if _etag_matches(if_none_match, etag):
+            return _not_modified_response(response)
+        return payload
+    revision = await build_news_cache_revision(
+        db,
+        include_views=False,
+        lang=lang,
+    )
+    etag = _make_news_etag("news-feed-v3", lang.lower(), normalized_limit, revision)
+    _set_news_cache_headers(request, response, etag=etag)
+    if _etag_matches(if_none_match, etag):
+        return _not_modified_response(response)
+    cache_key = f"news:feed:v3:{lang.lower()}:{normalized_limit}:{revision}"
     cached = await _get_cached_payload(request, cache_key)
     if cached is not None:
+        _set_process_news_payload(request, process_cache_key, etag=etag, payload=cached)
         return cached
     payload = await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
     await _set_cached_payload(request, cache_key, payload)
+    _set_process_news_payload(request, process_cache_key, etag=etag, payload=payload)
     return payload
 
 
 @router.get("/news")
 async def news_list(
     request: Request,
+    response: Response,
     page: int = 1,
-    pageSize: int = 20,
+    pageSize: int = 30,
     lang: str = "en",
     sort: str = "latest",
     category: str | None = None,
+    if_none_match: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     normalized_page = max(1, page)
     normalized_page_size = max(1, min(pageSize, 30))
     normalized_sort = "trending" if (sort or "").strip().lower() == "trending" else "latest"
     normalized_category = (category or "").strip().lower() or "all"
-    cache_key = (
-        f"news:list:{lang.lower()}:{normalized_page}:{normalized_page_size}:"
+    process_cache_key = (
+        f"news:list:v4:{lang.lower()}:{normalized_page}:{normalized_page_size}:"
         f"{normalized_sort}:{normalized_category}"
+    )
+    process_cached = _get_process_news_payload(request, process_cache_key)
+    if process_cached is not None:
+        etag, payload = process_cached
+        _set_news_cache_headers(request, response, etag=etag)
+        if _etag_matches(if_none_match, etag):
+            return _not_modified_response(response)
+        return payload
+    revision = await build_news_cache_revision(
+        db,
+        is_liquidation=False,
+        category=None if normalized_category == "all" else normalized_category,
+        include_views=normalized_sort == "trending",
+        lang=lang,
+    )
+    etag = _make_news_etag(
+        "news-list-v3",
+        lang.lower(),
+        normalized_page,
+        normalized_page_size,
+        normalized_sort,
+        normalized_category,
+        revision,
+    )
+    _set_news_cache_headers(request, response, etag=etag)
+    if _etag_matches(if_none_match, etag):
+        return _not_modified_response(response)
+    cache_key = (
+        f"news:list:v3:{lang.lower()}:{normalized_page}:{normalized_page_size}:"
+        f"{normalized_sort}:{normalized_category}:{revision}"
     )
     cached = await _get_cached_payload(request, cache_key)
     if cached is not None:
+        _set_process_news_payload(request, process_cache_key, etag=etag, payload=cached)
         return cached
     payload = await build_news_list_payload(
         db,
@@ -329,6 +464,7 @@ async def news_list(
         category=None if normalized_category == "all" else normalized_category,
     )
     await _set_cached_payload(request, cache_key, payload)
+    _set_process_news_payload(request, process_cache_key, etag=etag, payload=payload)
     return payload
 
 
@@ -348,23 +484,46 @@ async def mark_news_read(
 @router.get("/home/overview")
 async def home_overview(
     request: Request,
-    news_limit: int = 10,
+    response: Response,
+    news_limit: int = 18,
     lang: str = "en",
+    if_none_match: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    normalized_limit = max(1, min(news_limit, 12))
-    cache_key = f"home:overview:{lang.lower()}:{normalized_limit}"
+    normalized_limit = max(1, min(news_limit, 18))
+    process_cache_key = f"home:overview:v4:{lang.lower()}:{normalized_limit}"
+    process_cached = _get_process_news_payload(request, process_cache_key)
+    if process_cached is not None:
+        etag, payload = process_cached
+        _set_news_cache_headers(request, response, etag=etag)
+        if _etag_matches(if_none_match, etag):
+            return _not_modified_response(response)
+        return payload
+    feed_revision = await build_news_cache_revision(
+        db,
+        include_views=False,
+        lang=lang,
+    )
+    etag = _make_news_etag("home-overview-v3", lang.lower(), normalized_limit, feed_revision)
+    _set_news_cache_headers(request, response, etag=etag)
+    if _etag_matches(if_none_match, etag):
+        return _not_modified_response(response)
+    cache_key = f"home:overview:v3:{lang.lower()}:{normalized_limit}:{feed_revision}"
     cached = await _get_cached_payload(request, cache_key)
     if cached is not None:
+        _set_process_news_payload(request, process_cache_key, etag=etag, payload=cached)
         return cached
-    feed_cache_key = f"news:feed:{lang.lower()}:{normalized_limit}"
+    feed_cache_key = f"news:feed:v3:{lang.lower()}:{normalized_limit}:{feed_revision}"
     news = await _get_cached_payload(request, feed_cache_key)
     if news is None:
         news = await build_news_feed_payload(db, lang=lang, limit=normalized_limit)
         await _set_cached_payload(request, feed_cache_key, news)
-    updated_at = _utc_now().isoformat()
-    payload = {"news": news, "updatedAt": updated_at}
+    payload = {
+        "news": news,
+        "updatedAt": str(news.get("updatedAt") or _utc_now().isoformat()),
+    }
     await _set_cached_payload(request, cache_key, payload)
+    _set_process_news_payload(request, process_cache_key, etag=etag, payload=payload)
     return payload
 
 

@@ -14,3 +14,4 @@ httpx==0.28.1
 feedparser==6.0.11
 cryptography==46.0.5
 prometheus-client==0.23.1
+cloudscraper==1.2.71

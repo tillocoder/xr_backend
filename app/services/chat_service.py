@@ -39,13 +39,26 @@ def _decode_cursor(cursor: str | None) -> tuple[datetime, str] | None:
 def _message_preview(message: Message | None) -> str:
     if message is None:
         return ""
-    if message.deleted_at is not None:
+    return _message_preview_from_fields(
+        body=message.body,
+        message_type=message.message_type,
+        deleted_at=message.deleted_at,
+    )
+
+
+def _message_preview_from_fields(
+    *,
+    body: str | None,
+    message_type: str | None,
+    deleted_at: datetime | None,
+) -> str:
+    if deleted_at is not None:
         return "Message deleted"
-    if message.message_type == "voice":
+    if message_type == "voice":
         return "Voice message"
-    if message.message_type == "image":
+    if message_type == "image":
         return "Photo"
-    return (message.body or "").strip()
+    return (body or "").strip()
 
 
 def _serialize_chat_message(
@@ -156,24 +169,75 @@ async def list_conversations(
     )
 
     rows = (await db.execute(stmt)).all()
+    chat_ids = [chat.id for _member, chat, _last_message_at in rows]
+    if not chat_ids:
+        return []
+
+    peer_rows = (
+        await db.execute(
+            select(ChatMember.chat_id, User)
+            .join(User, ChatMember.user_id == User.id)
+            .where(
+                ChatMember.chat_id.in_(chat_ids),
+                ChatMember.user_id != user_id,
+            )
+            .order_by(ChatMember.chat_id.asc(), ChatMember.joined_at.asc(), User.id.asc())
+        )
+    ).all()
+    peers_by_chat_id: dict[str, User] = {}
+    for chat_id, peer in peer_rows:
+        peers_by_chat_id.setdefault(chat_id, peer)
+
+    latest_message_ranked = (
+        select(
+            Message.chat_id.label("chat_id"),
+            Message.sender_id.label("sender_id"),
+            Message.body.label("body"),
+            Message.message_type.label("message_type"),
+            Message.deleted_at.label("deleted_at"),
+            Message.updated_at.label("updated_at"),
+            Message.created_at.label("created_at"),
+            func.row_number()
+            .over(
+                partition_by=Message.chat_id,
+                order_by=(Message.created_at.desc(), Message.id.desc()),
+            )
+            .label("message_rank"),
+        )
+        .where(Message.chat_id.in_(chat_ids))
+        .subquery()
+    )
+    latest_message_rows = (
+        await db.execute(
+            select(
+                latest_message_ranked.c.chat_id,
+                latest_message_ranked.c.sender_id,
+                latest_message_ranked.c.body,
+                latest_message_ranked.c.message_type,
+                latest_message_ranked.c.deleted_at,
+                latest_message_ranked.c.updated_at,
+                latest_message_ranked.c.created_at,
+            ).where(latest_message_ranked.c.message_rank == 1)
+        )
+    ).all()
+    latest_messages_by_chat_id = {
+        chat_id: {
+            "sender_id": sender_id,
+            "body": body,
+            "message_type": message_type,
+            "deleted_at": deleted_at,
+            "updated_at": updated_at,
+            "created_at": created_at,
+        }
+        for chat_id, sender_id, body, message_type, deleted_at, updated_at, created_at in latest_message_rows
+    }
+
     conversations: list[ChatConversationOut] = []
     for member, chat, last_message_at in rows:
-        peer_stmt = (
-            select(User)
-            .join(ChatMember, ChatMember.user_id == User.id)
-            .where(ChatMember.chat_id == chat.id, User.id != user_id)
-            .limit(1)
-        )
-        peer = (await db.scalars(peer_stmt)).first()
+        peer = peers_by_chat_id.get(chat.id)
         if peer is None:
             continue
-
-        last_message = await db.scalar(
-            select(Message)
-            .where(Message.chat_id == chat.id)
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .limit(1)
-        )
+        last_message = latest_messages_by_chat_id.get(chat.id)
 
         conversations.append(
             ChatConversationOut(
@@ -185,12 +249,26 @@ async def list_conversations(
                     membership_tier=_daily_rewards.effective_membership_tier_user(peer),
                     is_pro=_daily_rewards.is_effective_pro_user(peer),
                 ),
-                last_message_text=_message_preview(last_message),
-                last_message_sender_uid=last_message.sender_id if last_message is not None else None,
+                last_message_text=(
+                    _message_preview_from_fields(
+                        body=str(last_message.get("body") or ""),
+                        message_type=str(last_message.get("message_type") or "text"),
+                        deleted_at=last_message.get("deleted_at"),
+                    )
+                    if last_message is not None
+                    else ""
+                ),
+                last_message_sender_uid=(
+                    str(last_message.get("sender_id") or "") or None
+                    if last_message is not None
+                    else None
+                ),
                 last_message_at=last_message_at,
                 unread_count=member.unread_count,
                 updated_at=(
-                    last_message.updated_at if last_message is not None and last_message.updated_at is not None else last_message_at
+                    last_message.get("updated_at")
+                    if last_message is not None and last_message.get("updated_at") is not None
+                    else last_message_at
                 )
                 or chat.created_at,
             )
