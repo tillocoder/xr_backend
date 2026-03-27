@@ -123,4 +123,4 @@ async def refresh_signal_market_snapshot(
 ) -> dict[str, Any]:
     del current_user
     service = _service_from_request(request)
-    return await service.refresh_market_snapshot(db, force_refresh=True)
+    return await service.request_market_snapshot_refresh(db)

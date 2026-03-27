@@ -1,0 +1,493 @@
+{
+  "apiBaseUrl": "http://127.0.0.1:8031/api/v1",
+  "results": [
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "status_code": 200,
+      "duration_ms": 19.31,
+      "ok": true,
+      "detail": "{\"ok\":true}"
+    },
+    {
+      "name": "news_feed_en",
+      "method": "GET",
+      "path": "/news/feed",
+      "status_code": 200,
+      "duration_ms": 43.2,
+      "ok": true,
+      "detail": "{\"latest\":[],\"liquidations\":[],\"updatedAt\":\"1970-01-01T00:00:00+00:00\",\"lang\":\"en\",\"aiEnabled\":true,\"limit\":18}"
+    },
+    {
+      "name": "news_list_en",
+      "method": "GET",
+      "path": "/news",
+      "status_code": 200,
+      "duration_ms": 22.81,
+      "ok": true,
+      "detail": "{\"items\":[],\"page\":1,\"pageSize\":30,\"total\":0,\"totalPages\":1,\"hasMore\":false,\"lang\":\"en\",\"sort\":\"latest\",\"category\":\"all\",\"aiEnabled\":true,\"updatedAt\":\"1970-01-01T00:00:00+00:00\"}"
+    },
+    {
+      "name": "home_overview_en",
+      "method": "GET",
+      "path": "/home/overview",
+      "status_code": 200,
+      "duration_ms": 7.29,
+      "ok": true,
+      "detail": "{\"news\":{\"latest\":[],\"liquidations\":[],\"updatedAt\":\"1970-01-01T00:00:00+00:00\",\"lang\":\"en\",\"aiEnabled\":true,\"limit\":18},\"updatedAt\":\"1970-01-01T00:00:00+00:00\"}"
+    },
+    {
+      "name": "learning_videos",
+      "method": "GET",
+      "path": "/learning/videos",
+      "status_code": 200,
+      "duration_ms": 13.73,
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "auth_google_probe_user_a",
+      "method": "POST",
+      "path": "/auth/google",
+      "status_code": 200,
+      "duration_ms": 24.69,
+      "ok": true,
+      "detail": "{\"accessToken\":\"vzQL_aLqQmSMcQbY7GngUK7J-ZBAB8fvJ5yPppRmcww\",\"refreshToken\":\"Y_SdMfV9xjRG9aEoUgwuMQVZnubV9nE43MvZXF2Y--arxGk-3R9CC7Y8rf-t3qYv\",\"accessExpiresAt\":\"2026-04-25T13:05:07.894034+00:00\",\"refreshExpiresAt\":\"2026-09-22T13:05:07.894034+00:00\",\"expiresAt\":\"2026-04-25T13:05:07.894034+00:00\",\"user\":{\"id\":\"85350295c8ae96afa099f2a75e85d74c\",\"email\":\"probe-a-1774530307@xrhodl.local\",\"displayName\":\"Probe User A\",\"photoUrl\":\"https://example.com/avatar.png\",\"authProvider\":\"google.com\"}}"
+    },
+    {
+      "name": "auth_google_probe_user_b",
+      "method": "POST",
+      "path": "/auth/google",
+      "status_code": 200,
+      "duration_ms": 13.07,
+      "ok": true,
+      "detail": "{\"accessToken\":\"YLyttSMCaUVGiANpAlYXSDqD37SyvZ5F6weaPW70fMo\",\"refreshToken\":\"M5RdiNPjcFILfFbuolPDoawXsZdAfi9V1BCt9BA0u9bvvqHSNxCTVz8MgFOt6Hrh\",\"accessExpiresAt\":\"2026-04-25T13:05:07.911194+00:00\",\"refreshExpiresAt\":\"2026-09-22T13:05:07.911194+00:00\",\"expiresAt\":\"2026-04-25T13:05:07.911194+00:00\",\"user\":{\"id\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"email\":\"probe-b-1774530307@xrhodl.local\",\"displayName\":\"Probe User B\",\"photoUrl\":\"https://example.com/avatar.png\",\"authProvider\":\"google.com\"}}"
+    },
+    {
+      "name": "auth_session_a",
+      "method": "GET",
+      "path": "/auth/session",
+      "status_code": 200,
+      "duration_ms": 14.99,
+      "ok": true,
+      "detail": "{\"id\":\"85350295c8ae96afa099f2a75e85d74c\",\"email\":null,\"displayName\":\"Probe User A\",\"photoUrl\":\"https://example.com/avatar.png\",\"authProvider\":\"google.com\"}"
+    },
+    {
+      "name": "me_bootstrap",
+      "method": "GET",
+      "path": "/me/bootstrap",
+      "status_code": 200,
+      "duration_ms": 11.25,
+      "ok": true,
+      "detail": "{\"settings\":{},\"holdings\":[],\"linkedWallets\":[],\"watchlist\":[],\"isPro\":false,\"membershipTier\":\"free\",\"effectiveMembershipTier\":\"free\",\"dailyReward\":{\"diamondsBalance\":0,\"currentStreak\":0,\"streakGoal\":7,\"rewardPerClaim\":100,\"rewardProCost\":700,\"rewardProDurationDays\":5,\"rewardProPostsPerDay\":5,\"paidProPostsPerDay\":20,\"canClaimNow\":true,\"lastClaimedAt\":null,\"nextClaimAt\":null,\"rewardProExpiresAt\":null,\"membershipTier\":\"free\",\"effectiveMembershipTier\":\"free\",\"paidProActive\":false,\"rewardProActive\":false,\"effectiveProActive\":false,\"rewardProRemainingSeconds\":0}}"
+    },
+    {
+      "name": "me_daily_reward",
+      "method": "GET",
+      "path": "/me/daily-reward",
+      "status_code": 200,
+      "duration_ms": 14.08,
+      "ok": true,
+      "detail": "{\"diamondsBalance\":0,\"currentStreak\":0,\"streakGoal\":7,\"rewardPerClaim\":100,\"rewardProCost\":700,\"rewardProDurationDays\":5,\"rewardProPostsPerDay\":5,\"paidProPostsPerDay\":20,\"canClaimNow\":true,\"lastClaimedAt\":null,\"nextClaimAt\":null,\"rewardProExpiresAt\":null,\"membershipTier\":\"free\",\"effectiveMembershipTier\":\"free\",\"paidProActive\":false,\"rewardProActive\":false,\"effectiveProActive\":false,\"rewardProRemainingSeconds\":0}"
+    },
+    {
+      "name": "me_membership_offers",
+      "method": "GET",
+      "path": "/me/membership/offers",
+      "status_code": 200,
+      "duration_ms": 12.85,
+      "ok": true,
+      "detail": "{\"proPlans\":[{\"code\":\"xr_pro_1m\",\"tier\":\"pro\",\"title\":\"XR Pro 1 month\",\"subtitle\":\"Community posting, premium avatar wave, stronger profile presence.\",\"durationMonths\":1,\"priceAmount\":15000.0,\"currency\":\"UZS\",\"displayPrice\":\"15 000 so'm\",\"badgeLabel\":\"STARTER\"},{\"code\":\"xr_pro_3m\",\"tier\":\"pro\",\"title\":\"XR Pro 3 months\",\"subtitle\":\"Same Pro access for a focused quarter.\",\"durationMonths\":3,\"priceAmount\":45000.0,\"currency\":\"UZS\",\"displayPrice\":\"45 000 so'm\",\"badgeLabel\":\"POPULAR\"},{\"code\":\"xr_pro_12m\",\"tier\":\"pro\",\"title\":\"XR Pro 12 months\",\"subtitle\":\"A full year of Pro access without renewal pressure.\",\"durationMonths\":12,\"priceAmount\":180000.0,\"currency\":\"UZS\",\"displayPrice\":\"180 000 so'm\",\"badgeLabel\":\"BEST VALUE\"}],\"legendPlans\":[{\"code\":\"xr_legend_12m\",\"tier\":\"legend\",\"title\":\"XR Legend 12 months\",\"subtitle\":\"Top-tier annual legend membership with the most exclusive profile tier.\",\"durationMonths\":12,\"priceAmount\":85.0,\"currency\":\"USD\",\"displayPrice\":\"$85 / year\",\"badgeLabel\":\"LEGEND ONLY\"}]}"
+    },
+    {
+      "name": "me_purchase_intent",
+      "method": "POST",
+      "path": "/me/membership/purchase-intent",
+      "status_code": 200,
+      "duration_ms": 22.07,
+      "ok": true,
+      "detail": "{\"checkoutToken\":\"checkout_da02845888e14ddf9e6adec56c16e05b\",\"tier\":\"pro\",\"planCode\":\"xr_pro_1m\",\"status\":\"activated_mock\",\"title\":\"XR Pro 1 month\",\"durationMonths\":1,\"priceAmount\":15000.0,\"currency\":\"UZS\",\"displayPrice\":\"15 000 so'm\",\"message\":\"XR Pro 1 month is active for 85350295c8ae96afa099f2a75e85d74c. This backend currently applies the tier immediately so the app can be tested end-to-end.\"}"
+    },
+    {
+      "name": "me_update_settings",
+      "method": "PUT",
+      "path": "/me/settings",
+      "status_code": 200,
+      "duration_ms": 15.43,
+      "ok": true,
+      "detail": "{\"ok\":true,\"changed\":true}"
+    },
+    {
+      "name": "me_update_watchlist",
+      "method": "PUT",
+      "path": "/me/watchlist",
+      "status_code": 200,
+      "duration_ms": 16.14,
+      "ok": true,
+      "detail": "{\"ok\":true,\"changed\":true}"
+    },
+    {
+      "name": "me_notifications",
+      "method": "GET",
+      "path": "/me/notifications",
+      "status_code": 200,
+      "duration_ms": 19.95,
+      "ok": true,
+      "detail": "{\"items\":[],\"unread_count\":0}"
+    },
+    {
+      "name": "me_push_register",
+      "method": "POST",
+      "path": "/me/push-token",
+      "status_code": 204,
+      "duration_ms": 16.8,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "signals_bootstrap",
+      "method": "GET",
+      "path": "/me/signals/bootstrap",
+      "status_code": 200,
+      "duration_ms": 23.01,
+      "ok": true,
+      "detail": "{\"isPro\":true,\"membershipTier\":\"pro\",\"preferences\":{\"enabled\":true,\"priceTargetEnabled\":true,\"percentChangeEnabled\":true,\"volumeSpikeEnabled\":true,\"fearGreedExtremeEnabled\":true,\"whaleActivityEnabled\":true,\"percentThreshold\":5.0,\"volumeMultiplier\":1.8},\"targets\":[],\"snapshot\":{\"updatedAt\":\"2026-03-26T13:04:55.156865+00:00\",\"trackedLimit\":20,\"coins\":[{\"id\":\"bitcoin\",\"symbol\":\"BTC\",\"name\":\"Bitcoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400\",\"price\":69402.0,\"change24h\":-3.26989,\"marketCap\":1388453282199.0,\"totalVolume\":36266357438.0,\"rank\":1,\"isTopTracked\":true},{\"id\":\"ethereum\",\"symbol\":\"ETH\",\"name\":\"Ethereum\",\"image\":\"https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628\",\"price\":2072.14,\"change24h\":-5.15728,\"marketCap\":250085572890.0,\"totalVolume\":16563741432.0,\"rank\":2,\"isTopTracked\":true},{\"id\":\"tether\",\"symbol\":\"USDT\",\"name\":\"Tether\",\"image\":\"https://coin-images.coingecko.com/coins/images/325/large/Tether.png?1696501661\",\"price\":0.999528,\"change24h\":-0.02221,\"marketCap\":184130049007.0,\"totalVolume\":61070143497.0,\"rank\":3,\"isTopTracked\":true},{\"id\":\"binancecoin\",\"symbol\":\"BNB\",\"name\":\"BNB\",\"image\":\"https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970\",\"price\":629.5,\"change24h\":-3.04722,\"marketCap\":85829905653.0,\"totalVolume\":867643565.0,\"rank\":4,\"isTopTracked\":true},{\"id\":\"ripple\",\"symbol\":\"XRP\",\"name\":\"XRP\",\"image\":\"https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442\",\"price\":1.37,\"change24h\":-3.23537,\"marketCap\":84281288135.0,\"totalVolume\":1776659006.0,\"rank\":5,\"isTopTracked\":true},{\"id\":\"usd-coin\",\"symbol\":\"USDC\",\"name\":\"USDC\",\"image\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"price\":0.999903,\"change24h\":0.00826,\"marketCap\":78627644780.0,\"totalVolume\":4279381238.0,\"rank\":6,\"isTopTracked\":true},{\"id\":\"solana\",\"symbol\":\"SOL\",\"name\":\"Solana\",\"image\":\"https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756\",\"price\":87.55,\"change24h\":-5.73582,\"marketCap\":50097983044.0,\"totalVolume\":3529946572.0,\"rank\":7,\"isTopTracked\":true},{\"id\":\"tron\",\"symbol\":\"TRX\",\"name\":\"TRON\",\"image\":\"https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png?1696502193\",\"price\":0.311169,\"change24h\":0.50804,\"marketCap\":29486377688.0,\"totalVolume\":560418354.0,\"rank\":8,\"isTopTracked\":true},{\"id\":\"figure-heloc\",\"symbol\":\"FIGR_HELOC\",\"name\":\"Figure Heloc\",\"image\":\"https://coin-images.coingecko.com/coins/images/68480/large/figure.png?1755863954\",\"price\":1.024,\"change24h\":-0.91401,\"marketCap\":16542714466.0,\"totalVolume\":28180106.0,\"rank\":9,\"isTopTracked\":true},{\"id\":\"dogecoin\",\"symbol\":\"DOGE\",\"name\":\"Dogecoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501409\",\"price\":0.091559,\"change24h\":-6.18539,\"marketCap\":14060647349.0,\"totalVolume\":1141982174.0,\"rank\":10,\"isTopTracked\":true},{\"id\":\"usds\",\"symbol\":\"USDS\",\"name\":\"USDS\",\"image\":\"https://coin-images.coingecko.com/coins/images/39926/large/usds.webp?1726666683\",\"price\":0.999781,\"change24h\":-0.00199,\"marketCap\":11690475971.0,\"totalVolume\":37032598.0,\"rank\":11,\"isTopTracked\":true},{\"id\":\"whitebit\",\"symbol\":\"WBT\",\"name\":\"WhiteBIT Coin\",\"image\":\"https://coin-images.coingecko.com/coins/images/27045/large/wbt_token.png?1696526096\",\"price\":53.41,\"change24h\":-3.46939,\"marketCap\":11398338079.0,\"totalVolume\":51689835.0,\"rank\":12,\"isTopTracked\":true},{\"id\":\"cardano\",\"symbol\":\"ADA\",\"name\":\"Cardano\",\"image\":\"https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090\",\"price\":0.257999,\"change24h\":-6.04908,\"marketCap\":9508038452.0,\"totalVolume\":403373865.0,\"rank\":13,\"isTopTracked\":true},{\"id\":\"hyperliquid\",\"symbol\":\"HYPE\",\"name\":\"Hyperliquid\",\"image\":\"https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300\",\"price\":39.34,\"change24h\":-3.94436,\"marketCap\":9366373613.0,\"totalVolume\":251617773.0,\"rank\":14,\"isTopTracked\":true},{\"id\":\"bitcoin-cash\",\"symbol\":\"BCH\",\"name\":\"Bitcoin Cash\",\"image\":\"https://coin-images.coingecko.com/coins/images/780/large/bitcoin-cash-circle.png?1696501932\",\"price\":462.07,\"change24h\":-3.19885,\"marketCap\":9247969095.0,\"totalVolume\":191387445.0,\"rank\":15,\"isTopTracked\":true},{\"id\":\"leo-token\",\"symbol\":\"LEO\",\"name\":\"LEO Token\",\"image\":\"https://coin-images.coingecko.com/coins/images/8418/large/leo-token.png?1696508607\",\"price\":9.52,\"change24h\":0.65459,\"marketCap\":8767078657.0,\"totalVolume\":451993.0,\"rank\":16,\"isTopTracked\":true},{\"id\":\"chainlink\",\"symbol\":\"LINK\",\"name\":\"Chainlink\",\"image\":\"https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405\",\"price\":8.95,\"change24h\":-5.17039,\"marketCap\":6339452193.0,\"totalVolume\":357704155.0,\"rank\":17,\"isTopTracked\":true},{\"id\":\"monero\",\"symbol\":\"XMR\",\"name\":\"Monero\",\"image\":\"https://coin-images.coingecko.com/coins/images/69/large/monero_logo.png?1696501460\",\"price\":336.26,\"change24h\":-1.12288,\"marketCap\":6206167014.0,\"totalVolume\":98195008.0,\"rank\":18,\"isTopTracked\":true},{\"id\":\"ethena-usde\",\"symbol\":\"USDE\",\"name\":\"Ethena USDe\",\"image\":\"https://coin-images.coingecko.com/coins/images/33613/large/usde.png?1733810059\",\"price\":0.999143,\"change24h\":0.01519,\"marketCap\":5919093485.0,\"totalVolume\":87644606.0,\"rank\":19,\"isTopTracked\":true},{\"id\":\"stellar\",\"symbol\":\"XLM\",\"name\":\"Stellar\",\"image\":\"https://coin-images.coingecko.com/coins/images/100/large/fmpFRHHQ_400x400.jpg?1735231350\",\"price\":0.173459,\"change24h\":-2.94412,\"marketCap\":5730276735.0,\"totalVolume\":111899957.0,\"rank\":20,\"isTopTracked\":true}],\"trackedCoins\":[{\"id\":\"bitcoin\",\"symbol\":\"BTC\",\"name\":\"Bitcoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400\",\"price\":69402.0,\"change24h\":-3.26989,\"marketCap\":1388453282199.0,\"totalVolume\":36266357438.0,\"rank\":1,\"isTopTracked\":true},{\"id\":\"ethereum\",\"symbol\":\"ETH\",\"name\":\"Ethereum\",\"image\":\"https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628\",\"price\":2072.14,\"change24h\":-5.15728,\"marketCap\":250085572890.0,\"totalVolume\":16563741432.0,\"rank\":2,\"isTopTracked\":true},{\"id\":\"tether\",\"symbol\":\"USDT\",\"name\":\"Tether\",\"image\":\"https://coin-images.coingecko.com/coins/images/325/large/Tether.png?1696501661\",\"price\":0.999528,\"change24h\":-0.02221,\"marketCap\":184130049007.0,\"totalVolume\":61070143497.0,\"rank\":3,\"isTopTracked\":true},{\"id\":\"binancecoin\",\"symbol\":\"BNB\",\"name\":\"BNB\",\"image\":\"https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970\",\"price\":629.5,\"change24h\":-3.04722,\"marketCap\":85829905653.0,\"totalVolume\":867643565.0,\"rank\":4,\"isTopTracked\":true},{\"id\":\"ripple\",\"symbol\":\"XRP\",\"name\":\"XRP\",\"image\":\"https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442\",\"price\":1.37,\"change24h\":-3.23537,\"marketCap\":84281288135.0,\"totalVolume\":1776659006.0,\"rank\":5,\"isTopTracked\":true},{\"id\":\"usd-coin\",\"symbol\":\"USDC\",\"name\":\"USDC\",\"image\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"price\":0.999903,\"change24h\":0.00826,\"marketCap\":78627644780.0,\"totalVolume\":4279381238.0,\"rank\":6,\"isTopTracked\":true},{\"id\":\"solana\",\"symbol\":\"SOL\",\"name\":\"Solana\",\"image\":\"https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756\",\"price\":87.55,\"change24h\":-5.73582,\"marketCap\":50097983044.0,\"totalVolume\":3529946572.0,\"rank\":7,\"isTopTracked\":true},{\"id\":\"tron\",\"symbol\":\"TRX\",\"name\":\"TRON\",\"image\":\"https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png?1696502193\",\"price\":0.311169,\"change24h\":0.50804,\"marketCap\":29486377688.0,\"totalVolume\":560418354.0,\"rank\":8,\"isTopTracked\":true},{\"id\":\"figure-heloc\",\"symbol\":\"FIGR_HELOC\",\"name\":\"Figure Heloc\",\"image\":\"https://coin-images.coingecko.com/coins/images/68480/large/figure.png?1755863954\",\"price\":1.024,\"change24h\":-0.91401,\"marketCap\":16542714466.0,\"totalVolume\":28180106.0,\"rank\":9,\"isTopTracked\":true},{\"id\":\"dogecoin\",\"symbol\":\"DOGE\",\"name\":\"Dogecoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501409\",\"price\":0.091559,\"change24h\":-6.18539,\"marketCap\":14060647349.0,\"totalVolume\":1141982174.0,\"rank\":10,\"isTopTracked\":true},{\"id\":\"usds\",\"symbol\":\"USDS\",\"name\":\"USDS\",\"image\":\"https://coin-images.coingecko.com/coins/images/39926/large/usds.webp?1726666683\",\"price\":0.999781,\"change24h\":-0.00199,\"marketCap\":11690475971.0,\"totalVolume\":37032598.0,\"rank\":11,\"isTopTracked\":true},{\"id\":\"whitebit\",\"symbol\":\"WBT\",\"name\":\"WhiteBIT Coin\",\"image\":\"https://coin-images.coingecko.com/coins/images/27045/large/wbt_token.png?1696526096\",\"price\":53.41,\"change24h\":-3.46939,\"marketCap\":11398338079.0,\"totalVolume\":51689835.0,\"rank\":12,\"isTopTracked\":true},{\"id\":\"cardano\",\"symbol\":\"ADA\",\"name\":\"Cardano\",\"image\":\"https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090\",\"price\":0.257999,\"change24h\":-6.04908,\"marketCap\":9508038452.0,\"totalVolume\":403373865.0,\"rank\":13,\"isTopTracked\":true},{\"id\":\"hyperliquid\",\"symbol\":\"HYPE\",\"name\":\"Hyperliquid\",\"image\":\"https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300\",\"price\":39.34,\"change24h\":-3.94436,\"marketCap\":9366373613.0,\"totalVolume\":251617773.0,\"rank\":14,\"isTopTracked\":true},{\"id\":\"bitcoin-cash\",\"symbol\":\"BCH\",\"name\":\"Bitcoin Cash\",\"image\":\"https://coin-images.coingecko.com/coins/images/780/large/bitcoin-cash-circle.png?1696501932\",\"price\":462.07,\"change24h\":-3.19885,\"marketCap\":9247969095.0,\"totalVolume\":191387445.0,\"rank\":15,\"isTopTracked\":true},{\"id\":\"leo-token\",\"symbol\":\"LEO\",\"name\":\"LEO Token\",\"image\":\"https://coin-images.coingecko.com/coins/images/8418/large/leo-token.png?1696508607\",\"price\":9.52,\"change24h\":0.65459,\"marketCap\":8767078657.0,\"totalVolume\":451993.0,\"rank\":16,\"isTopTracked\":true},{\"id\":\"chainlink\",\"symbol\":\"LINK\",\"name\":\"Chainlink\",\"image\":\"https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405\",\"price\":8.95,\"change24h\":-5.17039,\"marketCap\":6339452193.0,\"totalVolume\":357704155.0,\"rank\":17,\"isTopTracked\":true},{\"id\":\"monero\",\"symbol\":\"XMR\",\"name\":\"Monero\",\"image\":\"https://coin-images.coingecko.com/coins/images/69/large/monero_logo.png?1696501460\",\"price\":336.26,\"change24h\":-1.12288,\"marketCap\":6206167014.0,\"totalVolume\":98195008.0,\"rank\":18,\"isTopTracked\":true},{\"id\":\"ethena-usde\",\"symbol\":\"USDE\",\"name\":\"Ethena USDe\",\"image\":\"https://coin-images.coingecko.com/coins/images/33613/large/usde.png?1733810059\",\"price\":0.999143,\"change24h\":0.01519,\"marketCap\":5919093485.0,\"totalVolume\":87644606.0,\"rank\":19,\"isTopTracked\":true},{\"id\":\"stellar\",\"symbol\":\"XLM\",\"name\":\"Stellar\",\"image\":\"https://coin-images.coingecko.com/coins/images/100/large/fmpFRHHQ_400x400.jpg?1735231350\",\"price\":0.173459,\"change24h\":-2.94412,\"marketCap\":5730276735.0,\"totalVolume\":111899957.0,\"rank\":20,\"isTopTracked\":true}],\"fearGreed\":{\"value\":10,\"classification\":\"Extreme Fear\",\"timestamp\":\"1774483200\"},\"stats\":{\"stories\":20,\"sources\":20,\"latestAgeSeconds\":0}},\"recentAlerts\":[{\"id\":\"1667909e01fb49ada4d2d77bee756f5f\",\"kind\":\"panic_alert\",\"coinId\":\"cardano\",\"title\":\"ADA panic alert\",\"body\":\"ADA dropped -6.18% in 24h.\",\"payload\":{\"kind\":\"market_alert\",\"price\":0.257168,\"coinId\":\"cardano\",\"coinName\":\"Cardano\",\"imageUrl\":\"https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090\",\"change24h\":-6.18199,\"coinSymbol\":\"ADA\",\"targetRoute\":\"/market\"},\"createdAt\":\"2026-03-26T17:07:01.506812+05:00\"},{\"id\":\"640a862fe672489f8afad13477ac12db\",\"kind\":\"smart_volume_signal\",\"coinId\":\"usd-coin\",\"title\":\"USDC volume spike\",\"body\":\"Volume expanded 2.55x versus recent flow.\",\"payload\":{\"kind\":\"smart_signal\",\"price\":0.999831,\"coinId\":\"usd-coin\",\"coinName\":\"USDC\",\"imageUrl\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"change24h\":-0.00153,\"coinSymbol\":\"USDC\",\"signalType\":\"volume_spike\",\"targetRoute\":\"/market\",\"volumeRatio\":2.5454542895483607},\"createdAt\":\"2026-03-26T16:48:19.986432+05:00\"},{\"id\":\"b8733e78b7a7436bbaa4d4aeae68afb6\",\"kind\":\"panic_alert\",\"coinId\":\"hyperliquid\",\"title\":\"HYPE panic alert\",\"body\":\"HYPE dropped -6.16% in 24h.\",\"payload\":{\"kind\":\"market_alert\",\"price\":38.91,\"coinId\":\"hyperliquid\",\"coinName\":\"Hyperliquid\",\"imageUrl\":\"https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300\",\"change24h\":-6.157,\"coinSymbol\":\"HYPE\",\"targetRoute\":\"/market\"},\"createdAt\":\"2026-03-26T16:37:15.463651+05:00\"},{\"id\":\"96e98c00cccd4b55a6372dd3f53aaa39\",\"kind\":\"panic_alert\",\"coinId\":\"solana\",\"title\":\"SOL panic alert\",\"body\":\"SOL dropped -5.92% in 24h.\",\"payload\":{\"kind\":\"market_alert\",\"price\":87.63,\"coinId\":\"solana\",\"coinName\":\"Solana\",\"imageUrl\":\"https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756\",\"change24h\":-5.91715,\"coinSymbol\":\"SOL\",\"targetRoute\":\"/market\"},\"createdAt\":\"2026-03-26T16:32:24.203862+05:00\"},{\"id\":\"404de1ae4150410b9bc6142951a69218\",\"kind\":\"whale_activity_alert\",\"coinId\":\"usd-coin\",\"title\":\"USDC whale activity\",\"body\":\"Abnormal high-volume flow detected around USDC.\",\"payload\":{\"kind\":\"smart_signal\",\"price\":0.999813,\"coinId\":\"usd-coin\",\"coinName\":\"USDC\",\"imageUrl\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"change24h\":-0.00843,\"coinSymbol\":\"USDC\",\"signalType\":\"whale_activity\",\"targetRoute\":\"/market\",\"volumeRatio\":2.740939467875951},\"createdAt\":\"2026-03-26T15:45:18.070004+05:00\"},{\"id\":\"c0e24d521fd646bfa891ba33bd20a38f\",\"kind\":\"fear_greed_extreme\",\"coinId\":null,\"title\":\"Fear & Greed extreme\",\"body\":\"Market sentiment is at 10 (Extreme Fear).\",\"payload\":{\"kind\":\"smart_signal\",\"signalType\":\"fear_greed_extreme\",\"targetRoute\":\"/market/fear-greed\",\"fearGreedValue\":10,\"fearGreedClassification\":\"Extreme Fear\"},\"createdAt\":\"2026-03-26T15:43:46.760686+05:00\"}]}"
+    },
+    {
+      "name": "signals_targets_list",
+      "method": "GET",
+      "path": "/me/signals/targets",
+      "status_code": 200,
+      "duration_ms": 10.82,
+      "ok": true,
+      "detail": "{\"items\":[]}"
+    },
+    {
+      "name": "signals_target_create",
+      "method": "POST",
+      "path": "/me/signals/targets",
+      "status_code": 200,
+      "duration_ms": 28.89,
+      "ok": true,
+      "detail": "{\"item\":{\"id\":\"b836675d24e54948bdb1eaf4d9b47ba9\",\"coinId\":\"bitcoin\",\"symbol\":\"BTC\",\"name\":\"Bitcoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400\",\"targetPrice\":50000.0,\"direction\":\"below\",\"isActive\":true,\"currentPrice\":69402.0,\"change24h\":-3.26989,\"createdAt\":\"2026-03-26T18:05:08.101387+05:00\"}}"
+    },
+    {
+      "name": "signals_refresh",
+      "method": "POST",
+      "path": "/me/signals/refresh",
+      "status_code": 200,
+      "duration_ms": 13.75,
+      "ok": true,
+      "detail": "{\"updatedAt\":\"2026-03-26T13:04:55.156865+00:00\",\"trackedLimit\":20,\"coins\":[{\"id\":\"bitcoin\",\"symbol\":\"BTC\",\"name\":\"Bitcoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400\",\"price\":69402.0,\"change24h\":-3.26989,\"marketCap\":1388453282199.0,\"totalVolume\":36266357438.0,\"rank\":1,\"isTopTracked\":true},{\"id\":\"ethereum\",\"symbol\":\"ETH\",\"name\":\"Ethereum\",\"image\":\"https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628\",\"price\":2072.14,\"change24h\":-5.15728,\"marketCap\":250085572890.0,\"totalVolume\":16563741432.0,\"rank\":2,\"isTopTracked\":true},{\"id\":\"tether\",\"symbol\":\"USDT\",\"name\":\"Tether\",\"image\":\"https://coin-images.coingecko.com/coins/images/325/large/Tether.png?1696501661\",\"price\":0.999528,\"change24h\":-0.02221,\"marketCap\":184130049007.0,\"totalVolume\":61070143497.0,\"rank\":3,\"isTopTracked\":true},{\"id\":\"binancecoin\",\"symbol\":\"BNB\",\"name\":\"BNB\",\"image\":\"https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970\",\"price\":629.5,\"change24h\":-3.04722,\"marketCap\":85829905653.0,\"totalVolume\":867643565.0,\"rank\":4,\"isTopTracked\":true},{\"id\":\"ripple\",\"symbol\":\"XRP\",\"name\":\"XRP\",\"image\":\"https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442\",\"price\":1.37,\"change24h\":-3.23537,\"marketCap\":84281288135.0,\"totalVolume\":1776659006.0,\"rank\":5,\"isTopTracked\":true},{\"id\":\"usd-coin\",\"symbol\":\"USDC\",\"name\":\"USDC\",\"image\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"price\":0.999903,\"change24h\":0.00826,\"marketCap\":78627644780.0,\"totalVolume\":4279381238.0,\"rank\":6,\"isTopTracked\":true},{\"id\":\"solana\",\"symbol\":\"SOL\",\"name\":\"Solana\",\"image\":\"https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756\",\"price\":87.55,\"change24h\":-5.73582,\"marketCap\":50097983044.0,\"totalVolume\":3529946572.0,\"rank\":7,\"isTopTracked\":true},{\"id\":\"tron\",\"symbol\":\"TRX\",\"name\":\"TRON\",\"image\":\"https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png?1696502193\",\"price\":0.311169,\"change24h\":0.50804,\"marketCap\":29486377688.0,\"totalVolume\":560418354.0,\"rank\":8,\"isTopTracked\":true},{\"id\":\"figure-heloc\",\"symbol\":\"FIGR_HELOC\",\"name\":\"Figure Heloc\",\"image\":\"https://coin-images.coingecko.com/coins/images/68480/large/figure.png?1755863954\",\"price\":1.024,\"change24h\":-0.91401,\"marketCap\":16542714466.0,\"totalVolume\":28180106.0,\"rank\":9,\"isTopTracked\":true},{\"id\":\"dogecoin\",\"symbol\":\"DOGE\",\"name\":\"Dogecoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501409\",\"price\":0.091559,\"change24h\":-6.18539,\"marketCap\":14060647349.0,\"totalVolume\":1141982174.0,\"rank\":10,\"isTopTracked\":true},{\"id\":\"usds\",\"symbol\":\"USDS\",\"name\":\"USDS\",\"image\":\"https://coin-images.coingecko.com/coins/images/39926/large/usds.webp?1726666683\",\"price\":0.999781,\"change24h\":-0.00199,\"marketCap\":11690475971.0,\"totalVolume\":37032598.0,\"rank\":11,\"isTopTracked\":true},{\"id\":\"whitebit\",\"symbol\":\"WBT\",\"name\":\"WhiteBIT Coin\",\"image\":\"https://coin-images.coingecko.com/coins/images/27045/large/wbt_token.png?1696526096\",\"price\":53.41,\"change24h\":-3.46939,\"marketCap\":11398338079.0,\"totalVolume\":51689835.0,\"rank\":12,\"isTopTracked\":true},{\"id\":\"cardano\",\"symbol\":\"ADA\",\"name\":\"Cardano\",\"image\":\"https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090\",\"price\":0.257999,\"change24h\":-6.04908,\"marketCap\":9508038452.0,\"totalVolume\":403373865.0,\"rank\":13,\"isTopTracked\":true},{\"id\":\"hyperliquid\",\"symbol\":\"HYPE\",\"name\":\"Hyperliquid\",\"image\":\"https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300\",\"price\":39.34,\"change24h\":-3.94436,\"marketCap\":9366373613.0,\"totalVolume\":251617773.0,\"rank\":14,\"isTopTracked\":true},{\"id\":\"bitcoin-cash\",\"symbol\":\"BCH\",\"name\":\"Bitcoin Cash\",\"image\":\"https://coin-images.coingecko.com/coins/images/780/large/bitcoin-cash-circle.png?1696501932\",\"price\":462.07,\"change24h\":-3.19885,\"marketCap\":9247969095.0,\"totalVolume\":191387445.0,\"rank\":15,\"isTopTracked\":true},{\"id\":\"leo-token\",\"symbol\":\"LEO\",\"name\":\"LEO Token\",\"image\":\"https://coin-images.coingecko.com/coins/images/8418/large/leo-token.png?1696508607\",\"price\":9.52,\"change24h\":0.65459,\"marketCap\":8767078657.0,\"totalVolume\":451993.0,\"rank\":16,\"isTopTracked\":true},{\"id\":\"chainlink\",\"symbol\":\"LINK\",\"name\":\"Chainlink\",\"image\":\"https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405\",\"price\":8.95,\"change24h\":-5.17039,\"marketCap\":6339452193.0,\"totalVolume\":357704155.0,\"rank\":17,\"isTopTracked\":true},{\"id\":\"monero\",\"symbol\":\"XMR\",\"name\":\"Monero\",\"image\":\"https://coin-images.coingecko.com/coins/images/69/large/monero_logo.png?1696501460\",\"price\":336.26,\"change24h\":-1.12288,\"marketCap\":6206167014.0,\"totalVolume\":98195008.0,\"rank\":18,\"isTopTracked\":true},{\"id\":\"ethena-usde\",\"symbol\":\"USDE\",\"name\":\"Ethena USDe\",\"image\":\"https://coin-images.coingecko.com/coins/images/33613/large/usde.png?1733810059\",\"price\":0.999143,\"change24h\":0.01519,\"marketCap\":5919093485.0,\"totalVolume\":87644606.0,\"rank\":19,\"isTopTracked\":true},{\"id\":\"stellar\",\"symbol\":\"XLM\",\"name\":\"Stellar\",\"image\":\"https://coin-images.coingecko.com/coins/images/100/large/fmpFRHHQ_400x400.jpg?1735231350\",\"price\":0.173459,\"change24h\":-2.94412,\"marketCap\":5730276735.0,\"totalVolume\":111899957.0,\"rank\":20,\"isTopTracked\":true}],\"trackedCoins\":[{\"id\":\"bitcoin\",\"symbol\":\"BTC\",\"name\":\"Bitcoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400\",\"price\":69402.0,\"change24h\":-3.26989,\"marketCap\":1388453282199.0,\"totalVolume\":36266357438.0,\"rank\":1,\"isTopTracked\":true},{\"id\":\"ethereum\",\"symbol\":\"ETH\",\"name\":\"Ethereum\",\"image\":\"https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628\",\"price\":2072.14,\"change24h\":-5.15728,\"marketCap\":250085572890.0,\"totalVolume\":16563741432.0,\"rank\":2,\"isTopTracked\":true},{\"id\":\"tether\",\"symbol\":\"USDT\",\"name\":\"Tether\",\"image\":\"https://coin-images.coingecko.com/coins/images/325/large/Tether.png?1696501661\",\"price\":0.999528,\"change24h\":-0.02221,\"marketCap\":184130049007.0,\"totalVolume\":61070143497.0,\"rank\":3,\"isTopTracked\":true},{\"id\":\"binancecoin\",\"symbol\":\"BNB\",\"name\":\"BNB\",\"image\":\"https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970\",\"price\":629.5,\"change24h\":-3.04722,\"marketCap\":85829905653.0,\"totalVolume\":867643565.0,\"rank\":4,\"isTopTracked\":true},{\"id\":\"ripple\",\"symbol\":\"XRP\",\"name\":\"XRP\",\"image\":\"https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442\",\"price\":1.37,\"change24h\":-3.23537,\"marketCap\":84281288135.0,\"totalVolume\":1776659006.0,\"rank\":5,\"isTopTracked\":true},{\"id\":\"usd-coin\",\"symbol\":\"USDC\",\"name\":\"USDC\",\"image\":\"https://coin-images.coingecko.com/coins/images/6319/large/USDC.png?1769615602\",\"price\":0.999903,\"change24h\":0.00826,\"marketCap\":78627644780.0,\"totalVolume\":4279381238.0,\"rank\":6,\"isTopTracked\":true},{\"id\":\"solana\",\"symbol\":\"SOL\",\"name\":\"Solana\",\"image\":\"https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756\",\"price\":87.55,\"change24h\":-5.73582,\"marketCap\":50097983044.0,\"totalVolume\":3529946572.0,\"rank\":7,\"isTopTracked\":true},{\"id\":\"tron\",\"symbol\":\"TRX\",\"name\":\"TRON\",\"image\":\"https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png?1696502193\",\"price\":0.311169,\"change24h\":0.50804,\"marketCap\":29486377688.0,\"totalVolume\":560418354.0,\"rank\":8,\"isTopTracked\":true},{\"id\":\"figure-heloc\",\"symbol\":\"FIGR_HELOC\",\"name\":\"Figure Heloc\",\"image\":\"https://coin-images.coingecko.com/coins/images/68480/large/figure.png?1755863954\",\"price\":1.024,\"change24h\":-0.91401,\"marketCap\":16542714466.0,\"totalVolume\":28180106.0,\"rank\":9,\"isTopTracked\":true},{\"id\":\"dogecoin\",\"symbol\":\"DOGE\",\"name\":\"Dogecoin\",\"image\":\"https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501409\",\"price\":0.091559,\"change24h\":-6.18539,\"marketCap\":14060647349.0,\"totalVolume\":1141982174.0,\"rank\":10,\"isTopTracked\":true},{\"id\":\"usds\",\"symbol\":\"USDS\",\"name\":\"USDS\",\"image\":\"https://coin-images.coingecko.com/coins/images/39926/large/usds.webp?1726666683\",\"price\":0.999781,\"change24h\":-0.00199,\"marketCap\":11690475971.0,\"totalVolume\":37032598.0,\"rank\":11,\"isTopTracked\":true},{\"id\":\"whitebit\",\"symbol\":\"WBT\",\"name\":\"WhiteBIT Coin\",\"image\":\"https://coin-images.coingecko.com/coins/images/27045/large/wbt_token.png?1696526096\",\"price\":53.41,\"change24h\":-3.46939,\"marketCap\":11398338079.0,\"totalVolume\":51689835.0,\"rank\":12,\"isTopTracked\":true},{\"id\":\"cardano\",\"symbol\":\"ADA\",\"name\":\"Cardano\",\"image\":\"https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090\",\"price\":0.257999,\"change24h\":-6.04908,\"marketCap\":9508038452.0,\"totalVolume\":403373865.0,\"rank\":13,\"isTopTracked\":true},{\"id\":\"hyperliquid\",\"symbol\":\"HYPE\",\"name\":\"Hyperliquid\",\"image\":\"https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300\",\"price\":39.34,\"change24h\":-3.94436,\"marketCap\":9366373613.0,\"totalVolume\":251617773.0,\"rank\":14,\"isTopTracked\":true},{\"id\":\"bitcoin-cash\",\"symbol\":\"BCH\",\"name\":\"Bitcoin Cash\",\"image\":\"https://coin-images.coingecko.com/coins/images/780/large/bitcoin-cash-circle.png?1696501932\",\"price\":462.07,\"change24h\":-3.19885,\"marketCap\":9247969095.0,\"totalVolume\":191387445.0,\"rank\":15,\"isTopTracked\":true},{\"id\":\"leo-token\",\"symbol\":\"LEO\",\"name\":\"LEO Token\",\"image\":\"https://coin-images.coingecko.com/coins/images/8418/large/leo-token.png?1696508607\",\"price\":9.52,\"change24h\":0.65459,\"marketCap\":8767078657.0,\"totalVolume\":451993.0,\"rank\":16,\"isTopTracked\":true},{\"id\":\"chainlink\",\"symbol\":\"LINK\",\"name\":\"Chainlink\",\"image\":\"https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405\",\"price\":8.95,\"change24h\":-5.17039,\"marketCap\":6339452193.0,\"totalVolume\":357704155.0,\"rank\":17,\"isTopTracked\":true},{\"id\":\"monero\",\"symbol\":\"XMR\",\"name\":\"Monero\",\"image\":\"https://coin-images.coingecko.com/coins/images/69/large/monero_logo.png?1696501460\",\"price\":336.26,\"change24h\":-1.12288,\"marketCap\":6206167014.0,\"totalVolume\":98195008.0,\"rank\":18,\"isTopTracked\":true},{\"id\":\"ethena-usde\",\"symbol\":\"USDE\",\"name\":\"Ethena USDe\",\"image\":\"https://coin-images.coingecko.com/coins/images/33613/large/usde.png?1733810059\",\"price\":0.999143,\"change24h\":0.01519,\"marketCap\":5919093485.0,\"totalVolume\":87644606.0,\"rank\":19,\"isTopTracked\":true},{\"id\":\"stellar\",\"symbol\":\"XLM\",\"name\":\"Stellar\",\"image\":\"https://coin-images.coingecko.com/coins/images/100/large/fmpFRHHQ_400x400.jpg?1735231350\",\"price\":0.173459,\"change24h\":-2.94412,\"marketCap\":5730276735.0,\"totalVolume\":111899957.0,\"rank\":20,\"isTopTracked\":true}],\"fearGreed\":{\"value\":10,\"classification\":\"Extreme Fear\",\"timestamp\":\"1774483200\"},\"stats\":{\"stories\":20,\"sources\":20,\"latestAgeSeconds\":0}}"
+    },
+    {
+      "name": "signals_target_delete",
+      "method": "DELETE",
+      "path": "/me/signals/targets/b836675d24e54948bdb1eaf4d9b47ba9",
+      "status_code": 204,
+      "duration_ms": 17.11,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "community_media_avatar",
+      "method": "POST",
+      "path": "/community/media/avatar",
+      "status_code": 200,
+      "duration_ms": 20.57,
+      "ok": true,
+      "detail": "{\"url\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"path\":\"/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\"}"
+    },
+    {
+      "name": "community_profile_sync_a",
+      "method": "POST",
+      "path": "/community/profiles/sync",
+      "status_code": 200,
+      "duration_ms": 516.39,
+      "ok": true,
+      "detail": "{\"uid\":\"85350295c8ae96afa099f2a75e85d74c\",\"displayName\":\"Probe User A\",\"username\":\"probea1774530308\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T13:05:08.210779Z\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T13:05:08.210779Z\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true}"
+    },
+    {
+      "name": "community_profile_sync_b",
+      "method": "POST",
+      "path": "/community/profiles/sync",
+      "status_code": 200,
+      "duration_ms": 23.69,
+      "ok": true,
+      "detail": "{\"uid\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"displayName\":\"Probe User B\",\"username\":\"probeb1774530308\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T13:05:08.707929Z\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probeb\"},\"publicWatchlistSymbols\":[\"SOL\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T13:05:08.707929Z\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"free\",\"isPro\":false}"
+    },
+    {
+      "name": "community_profile_a",
+      "method": "GET",
+      "path": "/community/profiles/85350295c8ae96afa099f2a75e85d74c",
+      "status_code": 200,
+      "duration_ms": 9.96,
+      "ok": true,
+      "detail": "{\"uid\":\"85350295c8ae96afa099f2a75e85d74c\",\"displayName\":\"Probe User A\",\"username\":\"probea1774530308\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T18:05:08.210779+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T18:05:08.210779+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true}"
+    },
+    {
+      "name": "community_profiles_recent",
+      "method": "GET",
+      "path": "/community/profiles/recent",
+      "status_code": 200,
+      "duration_ms": 16.96,
+      "ok": true,
+      "detail": "[{\"uid\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"displayName\":\"Khikmatullo\",\"username\":\"tillo_crypto\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/36887aac9ff4462ba2fe03fe1e03e94f.jpg\",\"coverImageUrl\":\"http://127.0.0.1:8031/media/community_profiles/covers/0ebba94060ac42e2a589ffca52f35694.jpg\",\"avatarUpdatedAt\":\"2026-03-25T14:55:10.845508+05:00\",\"coverImageUpdatedAt\":\"2026-03-25T14:55:10.845508+05:00\",\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{\"x\":\"ai\",\"youtube\":\"bdufafiau\",\"telegram\":\"ftd\"},\"publicWatchlistSymbols\":[\"ADA\",\"BCH\",\"BTC\",\"ETH\",\"FIGRHELOC\",\"LEO\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-10T17:59:41.628280+05:00\",\"displayNameWindowStartedAt\":\"2026-03-09T16:31:14.525943+05:00\",\"displayNameChangeCount\":1,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"ab7d4746c3d27872764d3749516f465b\",\"displayName\":\"Qudratillo\",\"username\":\"conexion\",\"avatarUrl\":\"https://lh3.googleusercontent.com/a/ACg8ocL-k1CUOFm79ioLGn3PJUAz8vDUvSmDXPDZMlqPs5y1I0Qe7bw=s96-c\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-12T20:43:03.541391+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"28.04.2010\",\"website\":\"\",\"socialAccounts\":{\"telegram\":\"t.me/xr_invest\"},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-12T20:43:03.541391+05:00\",\"displayNameWindowStartedAt\":\"2026-03-12T20:43:03.541391+05:00\",\"displayNameChangeCount\":1,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"3d2bff0c6a6c441fa867cb9309c29fe1\",\"displayName\":\"User A\",\"username\":\"usera\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"70a429fa002c41c2889214872b90e01b\",\"displayName\":\"User B\",\"username\":\"userb\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"ac19a0281cc1e4b728b881cc12c1adeb\",\"displayName\":\"Faxriddin Jo'raboyev\",\"username\":\"faxriddinjoraboyev\",\"avatarUrl\":\"https://lh3.googleusercontent.com/a/ACg8ocIhhHKrnk7ZnhgFP5ZRjLgnHL90eVD9t-jNtkfV6tCGB-yiZQ=s96-c\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-10T19:35:53.539276+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"88e2aa822993501dab2573752e411b31\",\"displayName\":\"Community User 2\",\"username\":\"communityuser2\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"397763353f7a183d233336b24aecb5e3\",\"displayName\":\"Community User\",\"username\":\"communityuser\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"ec9680a7634faaf2d6a935ae3704bc52\",\"displayName\":\"Mobile User\",\"username\":\"mobileuser\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"eb2b6c0d061bbd5caa545b6d1184a188\",\"displayName\":\"Dev User\",\"username\":\"devuser\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"5cd76c5e7035083a8d9a7060cc5ff48e\",\"displayName\":\"Tillo\\\\\",\"username\":\"tillo\",\"avatarUrl\":\"https://api.dicebear.com/7.x/avataaars/svg?seed=Tillo%5C\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-10T01:58:08.204927+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"ebb4be6bc306c4e86d7bd3bb84588cb3\",\"displayName\":\"Tillo\",\"username\":\"tillo\",\"avatarUrl\":\"https://api.dicebear.com/7.x/avataaars/svg?seed=Tillo\",\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"50c109f2da50bf09aafb884f979bb07f\",\"displayName\":\"Restart Test\",\"username\":\"restarttest\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"c997dcf58f3f3c4b5658e97db3f0b0c8\",\"displayName\":\"Refresh Test\",\"username\":\"refreshtest\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"099b349e2029b9d13eb9211e1ce67954\",\"displayName\":\"Senior Test\",\"username\":\"seniortest\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"\",\"birthdayLabel\":\"\",\"website\":\"\",\"socialAccounts\":{},\"publicWatchlistSymbols\":[],\"blockedAccountIds\":[],\"usernameUpdatedAt\":null,\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"legend\",\"isPro\":true},{\"uid\":\"85350295c8ae96afa099f2a75e85d74c\",\"displayName\":\"Probe User A\",\"username\":\"probea1774530308\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T18:05:08.210779+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T18:05:08.210779+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true},{\"uid\":\"c01695ccf56ef67b5f5843936f07a482\",\"displayName\":\"Probe Out A\",\"username\":\"poa1774529184\",\"avatarUrl\":null,\"coverImageUrl\":null,\"avatarUpdatedAt\":null,\"coverImageUpdatedAt\":null,\"biography\":\"probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local\",\"socialAccounts\":{\"x\":\"a\"},\"publicWatchlistSymbols\":[\"BTC\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T17:46:24.704842+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true},{\"uid\":\"01dc86188179ec6a287aa4cac4849b8a\",\"displayName\":\"Probe User A\",\"username\":\"probea1774529020\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/492e2b938db84015b37c663fb8ac4ae3.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T17:43:40.554864+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T17:43:40.554864+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true},{\"uid\":\"373d22d75377bb32bfe4828f9dec38b0\",\"displayName\":\"Probe User A\",\"username\":\"probea1774528910\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/9bb66668d5ec4cf6aff9d073a5a39e3c.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T17:41:51.008543+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T17:41:51.008543+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true},{\"uid\":\"c2789ef85a48e1da64e0b38271b5eac0\",\"displayName\":\"Probe User A\",\"username\":\"probea1774528682\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/45cbb44ab9574a03a9c20eb1ed96167f.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T17:38:02.444254+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T17:38:02.444254+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true},{\"uid\":\"bc649d2ea6bacce1ebed7f0e9bf63752\",\"displayName\":\"Probe User A\",\"username\":\"probea1774527839\",\"avatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/b0cacec5a5234f33aee71ca86465ba92.png\",\"coverImageUrl\":null,\"avatarUpdatedAt\":\"2026-03-26T17:23:59.782127+05:00\",\"coverImageUpdatedAt\":null,\"biography\":\"backend service probe\",\"birthdayLabel\":\"\",\"website\":\"https://xrhodl.local/probe\",\"socialAccounts\":{\"x\":\"probea\"},\"publicWatchlistSymbols\":[\"BTC\",\"ETH\"],\"blockedAccountIds\":[],\"usernameUpdatedAt\":\"2026-03-26T17:23:59.782127+05:00\",\"displayNameWindowStartedAt\":null,\"displayNameChangeCount\":0,\"membershipTier\":\"pro\",\"isPro\":true}]"
+    },
+    {
+      "name": "community_follow_b",
+      "method": "POST",
+      "path": "/community/profiles/f0fb5b68fea075a2516daf9cdfda0cdd/follow",
+      "status_code": 204,
+      "duration_ms": 27.07,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "community_follow_state",
+      "method": "GET",
+      "path": "/community/profiles/f0fb5b68fea075a2516daf9cdfda0cdd/follow-state",
+      "status_code": 200,
+      "duration_ms": 99.82,
+      "ok": true,
+      "detail": "{\"isFollowing\":true}"
+    },
+    {
+      "name": "community_followers_count_b",
+      "method": "GET",
+      "path": "/community/profiles/f0fb5b68fea075a2516daf9cdfda0cdd/followers/count",
+      "status_code": 200,
+      "duration_ms": 8.54,
+      "ok": true,
+      "detail": "{\"count\":1}"
+    },
+    {
+      "name": "community_media_post_image",
+      "method": "POST",
+      "path": "/community/media/post-image",
+      "status_code": 200,
+      "duration_ms": 8.6,
+      "ok": true,
+      "detail": "{\"url\":\"http://127.0.0.1:8031/media/community_posts/849cc3068f6244a580b85dbcbe6bfc04.png\",\"path\":\"/media/community_posts/849cc3068f6244a580b85dbcbe6bfc04.png\"}"
+    },
+    {
+      "name": "community_post_create",
+      "method": "POST",
+      "path": "/community/posts",
+      "status_code": 201,
+      "duration_ms": 65.24,
+      "ok": true,
+      "detail": "{\"id\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"authorUid\":\"85350295c8ae96afa099f2a75e85d74c\",\"authorName\":\"Probe User A\",\"authorUsername\":\"probea1774530308\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"authorMembershipTier\":\"pro\",\"authorIsPro\":true,\"content\":\"Probe post for backend service validation.\",\"symbol\":\"BTC\",\"symbols\":[\"BTC\",\"ETH\"],\"imageUrl\":\"http://127.0.0.1:8031/media/community_posts/849cc3068f6244a580b85dbcbe6bfc04.png\",\"marketBias\":\"bullish\",\"poll\":null,\"commentCount\":0,\"viewCount\":0,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":0,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-26T18:05:08.890900+05:00\"}"
+    },
+    {
+      "name": "community_posts_list",
+      "method": "GET",
+      "path": "/community/posts",
+      "status_code": 200,
+      "duration_ms": 25.81,
+      "ok": true,
+      "detail": "[{\"id\":\"fecc5498447241bd9e7c0414ec6e806c\",\"authorUid\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"authorName\":\"Khikmatullo\",\"authorUsername\":\"tillo_crypto\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/36887aac9ff4462ba2fe03fe1e03e94f.jpg\",\"authorMembershipTier\":\"legend\",\"authorIsPro\":true,\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.\",\"symbol\":null,\"symbols\":[],\"imageUrl\":\"http://127.0.0.1:8031/media/community_posts/65f63275f2464db99c120ac95a9c8a7d.jpg\",\"marketBias\":\"bullish\",\"poll\":null,\"commentCount\":0,\"viewCount\":0,\"reactionCounts\":{\"bullish_up\":1,\"bearish_down\":0,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-25T13:36:23.039365+05:00\"},{\"id\":\"f9def755f4b74d7b8ec256f60a6a91a5\",\"authorUid\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"authorName\":\"Khikmatullo\",\"authorUsername\":\"tillo_crypto\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/36887aac9ff4462ba2fe03fe1e03e94f.jpg\",\"authorMembershipTier\":\"legend\",\"authorIsPro\":true,\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Use the edit icon to pin, add or delete clips.\",\"symbol\":\"BTC\",\"symbols\":[\"BTC\",\"ETH\",\"SOL\",\"NFT\",\"BNB\",\"TON\"],\"imageUrl\":null,\"marketBias\":\"bearish\",\"poll\":null,\"commentCount\":0,\"viewCount\":1,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":0,\"laugh\":0,\"sad\":1,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-13T23:07:24.607237+05:00\"},{\"id\":\"8ee889c3291448648a1600bd6f5baaf1\",\"authorUid\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"authorName\":\"Khikmatullo\",\"authorUsername\":\"tillo_crypto\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/36887aac9ff4462ba2fe03fe1e03e94f.jpg\",\"authorMembershipTier\":\"legend\",\"authorIsPro\":true,\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Tap on a clip to paste it in the text box.Use the edit icon to pin, add or delete clips.Welcome to Gboard clipboard, any text you copy will be saved here.Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Tap on a clip to paste it in the text box.Use the edit icon to pin, add or delete clips.Tap on a clip to paste it in the text box.Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Welcome to Gboard clipboard, any text you copy will be saved here.\",\"symbol\":null,\"symbols\":[],\"imageUrl\":\"http://127.0.0.1:8031/media/community_posts/5bb93271028241a48056a782780a85f9.jpg\",\"marketBias\":null,\"poll\":null,\"commentCount\":2,\"viewCount\":3,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":1,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-11T03:24:15.388185+05:00\"},{\"id\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"authorUid\":\"85350295c8ae96afa099f2a75e85d74c\",\"authorName\":\"Probe User A\",\"authorUsername\":\"probea1774530308\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"authorMembershipTier\":\"pro\",\"authorIsPro\":true,\"content\":\"Probe post for backend service validation.\",\"symbol\":\"BTC\",\"symbols\":[\"BTC\",\"ETH\"],\"imageUrl\":\"http://127.0.0.1:8031/media/community_posts/849cc3068f6244a580b85dbcbe6bfc04.png\",\"marketBias\":\"bullish\",\"poll\":null,\"commentCount\":0,\"viewCount\":0,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":0,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-26T18:05:08.890900+05:00\"},{\"id\":\"b42b3c8928f94819a79b91ec4682942b\",\"authorUid\":\"c01695ccf56ef67b5f5843936f07a482\",\"authorName\":\"Probe Out A\",\"authorUsername\":\"poa1774529184\",\"authorAvatarUrl\":null,\"authorMembershipTier\":\"pro\",\"authorIsPro\":true,\"content\":\"probe post outliers\",\"symbol\":\"BTC\",\"symbols\":[\"BTC\"],\"imageUrl\":null,\"marketBias\":\"bullish\",\"poll\":null,\"commentCount\":1,\"viewCount\":0,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":0,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-26T17:46:24.789172+05:00\"}]"
+    },
+    {
+      "name": "community_feed",
+      "method": "GET",
+      "path": "/community/feed",
+      "status_code": 200,
+      "duration_ms": 35.25,
+      "ok": true,
+      "detail": "{\"items\":[{\"post\":{\"id\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"content\":\"Probe post for backend service validation.\",\"comment_count\":0,\"reaction_counts\":{},\"created_at\":\"2026-03-26T18:05:08.890900+05:00\"},\"author\":{\"id\":\"85350295c8ae96afa099f2a75e85d74c\",\"display_name\":\"Probe User A\",\"avatar_url\":\"/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"membership_tier\":\"pro\",\"is_pro\":true},\"viewer_state\":{\"reaction\":null,\"is_following_author\":false}},{\"post\":{\"id\":\"b42b3c8928f94819a79b91ec4682942b\",\"content\":\"probe post outliers\",\"comment_count\":1,\"reaction_counts\":{\"rocket\":1},\"created_at\":\"2026-03-26T17:46:24.789172+05:00\"},\"author\":{\"id\":\"c01695ccf56ef67b5f5843936f07a482\",\"display_name\":\"Probe Out A\",\"avatar_url\":null,\"membership_tier\":\"pro\",\"is_pro\":true},\"viewer_state\":{\"reaction\":null,\"is_following_author\":false}},{\"post\":{\"id\":\"fecc5498447241bd9e7c0414ec6e806c\",\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.\",\"comment_count\":0,\"reaction_counts\":{\"bullish_up\":1},\"created_at\":\"2026-03-25T13:36:23.039365+05:00\"},\"author\":{\"id\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"display_name\":\"Khikmatullo Rakhmonjonov\",\"avatar_url\":\"https://lh3.googleusercontent.com/a/ACg8ocKsOP1VNXWtffyMa8sRwxx-hFzpTQ7s38qWxIv-6u3_kTbIzXM2=s96-c\",\"membership_tier\":\"legend\",\"is_pro\":true},\"viewer_state\":{\"reaction\":null,\"is_following_author\":false}},{\"post\":{\"id\":\"f9def755f4b74d7b8ec256f60a6a91a5\",\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Use the edit icon to pin, add or delete clips.\",\"comment_count\":0,\"reaction_counts\":{\"sad\":1},\"created_at\":\"2026-03-13T23:07:24.607237+05:00\"},\"author\":{\"id\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"display_name\":\"Khikmatullo Rakhmonjonov\",\"avatar_url\":\"https://lh3.googleusercontent.com/a/ACg8ocKsOP1VNXWtffyMa8sRwxx-hFzpTQ7s38qWxIv-6u3_kTbIzXM2=s96-c\",\"membership_tier\":\"legend\",\"is_pro\":true},\"viewer_state\":{\"reaction\":null,\"is_following_author\":false}},{\"post\":{\"id\":\"8ee889c3291448648a1600bd6f5baaf1\",\"content\":\"Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Tap on a clip to paste it in the text box.Use the edit icon to pin, add or delete clips.Welcome to Gboard clipboard, any text you copy will be saved here.Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Tap on a clip to paste it in the text box.Use the edit icon to pin, add or delete clips.Tap on a clip to paste it in the text box.Touch and hold a clip to pin it. Unpinned clips will be deleted after 1 hour.Welcome to Gboard clipboard, any text you copy will be saved here.\",\"comment_count\":2,\"reaction_counts\":{\"bearish_down\":1},\"created_at\":\"2026-03-11T03:24:15.388185+05:00\"},\"author\":{\"id\":\"4252fdfe05fe31719d0b682d5f1c12f3\",\"display_name\":\"Khikmatullo Rakhmonjonov\",\"avatar_url\":\"https://lh3.googleusercontent.com/a/ACg8ocKsOP1VNXWtffyMa8sRwxx-hFzpTQ7s38qWxIv-6u3_kTbIzXM2=s96-c\",\"membership_tier\":\"legend\",\"is_pro\":true},\"viewer_state\":{\"reaction\":null,\"is_following_author\":false}}],\"next_cursor\":null,\"has_more\":false}"
+    },
+    {
+      "name": "community_post_detail",
+      "method": "GET",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e",
+      "status_code": 200,
+      "duration_ms": 13.39,
+      "ok": true,
+      "detail": "{\"id\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"authorUid\":\"85350295c8ae96afa099f2a75e85d74c\",\"authorName\":\"Probe User A\",\"authorUsername\":\"probea1774530308\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"authorMembershipTier\":\"pro\",\"authorIsPro\":true,\"content\":\"Probe post for backend service validation.\",\"symbol\":\"BTC\",\"symbols\":[\"BTC\",\"ETH\"],\"imageUrl\":\"http://127.0.0.1:8031/media/community_posts/849cc3068f6244a580b85dbcbe6bfc04.png\",\"marketBias\":\"bullish\",\"poll\":null,\"commentCount\":0,\"viewCount\":0,\"reactionCounts\":{\"bullish_up\":0,\"bearish_down\":0,\"laugh\":0,\"sad\":0,\"cry\":0,\"ok\":0,\"zor\":0},\"createdAt\":\"2026-03-26T18:05:08.890900+05:00\"}"
+    },
+    {
+      "name": "community_post_comment",
+      "method": "POST",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e/comments",
+      "status_code": 201,
+      "duration_ms": 43.44,
+      "ok": true,
+      "detail": "{\"id\":\"71b33e7230ea4938be90dc51fe0c982c\",\"postId\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"authorUid\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"authorName\":\"Probe User B\",\"authorUsername\":\"probeb1774530308\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"replyToCommentId\":null,\"replyToAuthorUsername\":null,\"content\":\"Probe comment.\",\"createdAt\":\"2026-03-26T18:05:09.032934+05:00\",\"reactionCounts\":{}}"
+    },
+    {
+      "name": "community_post_reaction",
+      "method": "POST",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e/reactions",
+      "status_code": 200,
+      "duration_ms": 22.92,
+      "ok": true,
+      "detail": "{\"postId\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"reaction\":\"rocket\",\"reactionCounts\":{\"rocket\":1},\"updatedAt\":\"2026-03-26T13:05:09.090647Z\"}"
+    },
+    {
+      "name": "community_post_reaction_get",
+      "method": "GET",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e/reaction",
+      "status_code": 200,
+      "duration_ms": 19.09,
+      "ok": true,
+      "detail": "{\"reactionKey\":null}"
+    },
+    {
+      "name": "community_post_comments_get",
+      "method": "GET",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e/comments",
+      "status_code": 200,
+      "duration_ms": 414.93,
+      "ok": true,
+      "detail": "[{\"id\":\"71b33e7230ea4938be90dc51fe0c982c\",\"postId\":\"b8516d83e27f4ef7a05fdeed82651d6e\",\"authorUid\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"authorName\":\"Probe User B\",\"authorUsername\":\"probeb1774530308\",\"authorAvatarUrl\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"replyToCommentId\":null,\"replyToAuthorUsername\":null,\"content\":\"Probe comment.\",\"createdAt\":\"2026-03-26T18:05:09.032934+05:00\",\"reactionCounts\":{}}]"
+    },
+    {
+      "name": "community_chat_send",
+      "method": "POST",
+      "path": "/community/chats/with/f0fb5b68fea075a2516daf9cdfda0cdd/messages",
+      "status_code": 201,
+      "duration_ms": 79.69,
+      "ok": true,
+      "detail": "{\"id\":\"fee1b108d61d4524ad07106e90b13991\",\"chat_id\":\"75e247b93c964a518741361a4382525f\",\"sender_id\":\"85350295c8ae96afa099f2a75e85d74c\",\"recipient_id\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"body\":\"Probe direct message\",\"message_type\":\"text\",\"media_url\":null,\"media_duration_ms\":0,\"waveform\":[],\"created_at\":\"2026-03-26T18:05:09.563693+05:00\",\"updated_at\":null,\"deleted_at\":null,\"read_at\":null,\"reply_to\":null}"
+    },
+    {
+      "name": "community_chats_list_a",
+      "method": "GET",
+      "path": "/community/chats",
+      "status_code": 200,
+      "duration_ms": 681.53,
+      "ok": true,
+      "detail": "[{\"chat_id\":\"75e247b93c964a518741361a4382525f\",\"peer\":{\"id\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"display_name\":\"Probe User B\",\"avatar_url\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"membership_tier\":\"free\",\"is_pro\":false},\"last_message_text\":\"Probe direct message\",\"last_message_sender_uid\":\"85350295c8ae96afa099f2a75e85d74c\",\"last_message_at\":\"2026-03-26T18:05:09.563693+05:00\",\"unread_count\":0,\"updated_at\":\"2026-03-26T18:05:09.563693+05:00\"}]"
+    },
+    {
+      "name": "community_chat_with_peer_a",
+      "method": "GET",
+      "path": "/community/chats/with/f0fb5b68fea075a2516daf9cdfda0cdd",
+      "status_code": 200,
+      "duration_ms": 43.71,
+      "ok": true,
+      "detail": "{\"chat_id\":\"75e247b93c964a518741361a4382525f\",\"peer\":{\"id\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"display_name\":\"Probe User B\",\"avatar_url\":\"http://127.0.0.1:8031/media/community_profiles/avatars/6e171489c0424dd59e2babe2dbb1b35d.png\",\"membership_tier\":\"free\",\"is_pro\":false},\"last_message_text\":\"Probe direct message\",\"last_message_sender_uid\":\"85350295c8ae96afa099f2a75e85d74c\",\"last_message_at\":\"2026-03-26T18:05:09.563693+05:00\",\"unread_count\":0,\"updated_at\":\"2026-03-26T18:05:09.563693+05:00\"}"
+    },
+    {
+      "name": "community_chat_messages_a",
+      "method": "GET",
+      "path": "/community/chats/with/f0fb5b68fea075a2516daf9cdfda0cdd/messages",
+      "status_code": 200,
+      "duration_ms": 21.69,
+      "ok": true,
+      "detail": "[{\"id\":\"fee1b108d61d4524ad07106e90b13991\",\"chat_id\":\"75e247b93c964a518741361a4382525f\",\"sender_id\":\"85350295c8ae96afa099f2a75e85d74c\",\"recipient_id\":\"f0fb5b68fea075a2516daf9cdfda0cdd\",\"body\":\"Probe direct message\",\"message_type\":\"text\",\"media_url\":null,\"media_duration_ms\":0,\"waveform\":[],\"created_at\":\"2026-03-26T18:05:09.563693+05:00\",\"updated_at\":null,\"deleted_at\":null,\"read_at\":null,\"reply_to\":null}]"
+    },
+    {
+      "name": "community_chat_unread_b",
+      "method": "GET",
+      "path": "/community/chats/unread-count",
+      "status_code": 200,
+      "duration_ms": 23.49,
+      "ok": true,
+      "detail": "{\"unread_total\":1}"
+    },
+    {
+      "name": "community_chat_read_b",
+      "method": "POST",
+      "path": "/community/chats/with/85350295c8ae96afa099f2a75e85d74c/read",
+      "status_code": 204,
+      "duration_ms": 24.19,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "community_post_delete",
+      "method": "DELETE",
+      "path": "/community/posts/b8516d83e27f4ef7a05fdeed82651d6e",
+      "status_code": 204,
+      "duration_ms": 46.16,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "community_unfollow_b",
+      "method": "DELETE",
+      "path": "/community/profiles/f0fb5b68fea075a2516daf9cdfda0cdd/follow",
+      "status_code": 204,
+      "duration_ms": 20.0,
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "bursts": [
+    {
+      "name": "burst_news_feed_en",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 65.31,
+      "p95_ms": 98.4,
+      "max_ms": 101.5,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "burst_news_list_en",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 61.21,
+      "p95_ms": 98.71,
+      "max_ms": 143.03,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "burst_home_overview_en",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 65.51,
+      "p95_ms": 129.8,
+      "max_ms": 140.56,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "burst_me_bootstrap",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 179.81,
+      "p95_ms": 416.36,
+      "max_ms": 431.56,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "burst_community_posts",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 114.07,
+      "p95_ms": 195.32,
+      "max_ms": 204.03,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "burst_community_profiles_recent",
+      "requests": 20,
+      "success_count": 20,
+      "failure_count": 0,
+      "p50_ms": 69.69,
+      "p95_ms": 190.14,
+      "max_ms": 194.51,
+      "statuses": {
+        "200": 20
+      }
+    }
+  ]
+}

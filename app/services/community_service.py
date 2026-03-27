@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, delete, desc, func, select, update
+from sqlalchemy import case, delete, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +37,7 @@ from app.schemas.community import (
     CommunityUpdatePostRequest,
 )
 from app.schemas.ws import WsEnvelope
+from app.services.cache import RedisCache
 from app.services.community_support import (
     CommunityResponseFactory,
     empty_reaction_counts,
@@ -47,6 +48,7 @@ from app.services.community_support import (
     normalize_display_name,
     normalize_market_bias,
     normalize_media_reference,
+    normalize_reaction_code,
     normalize_reaction_key,
     normalize_short_text,
     normalize_social_accounts,
@@ -71,10 +73,12 @@ class CommunityService:
         *,
         notification_service: NotificationService | None = None,
         bus: RedisEventBus | None = None,
+        cache: RedisCache | None = None,
         public_base_url: str | None = None,
     ) -> None:
         self._notifications = notification_service
         self._bus = bus
+        self._cache = cache
         self._daily_rewards = DailyRewardService()
         self._media_root = Path(__file__).resolve().parents[2] / "media"
         self._public_base_url = (public_base_url or "").strip().rstrip("/")
@@ -91,7 +95,6 @@ class CommunityService:
         limit: int,
     ) -> list[CommunityPostResponse]:
         normalized_limit = max(1, min(limit, 100))
-        fetch_limit = normalized_limit if not symbol else max(36, min(normalized_limit * 3, 90))
         membership_priority = case(
             (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
             (
@@ -100,35 +103,44 @@ class CommunityService:
             ),
             else_=0,
         )
-        posts = list(
-            (
-                await db.scalars(
-                    select(Post)
-                    .join(User, User.id == Post.author_id)
-                    .order_by(
-                        desc(membership_priority),
-                        Post.created_at.desc(),
-                        Post.id.desc(),
-                    )
-                    .limit(fetch_limit)
-                )
-            ).all()
-        )
         normalized_symbol = normalize_symbol(symbol)
+        stmt = (
+            select(Post, User, CommunityProfile)
+            .join(User, User.id == Post.author_id)
+            .outerjoin(CommunityProfile, CommunityProfile.uid == Post.author_id)
+            .order_by(
+                desc(membership_priority),
+                Post.created_at.desc(),
+                Post.id.desc(),
+            )
+            .limit(normalized_limit)
+        )
         if normalized_symbol is not None:
-            posts = [
-                post
-                for post in posts
-                if post.symbol == normalized_symbol
-                or normalized_symbol in normalize_symbols(post.symbols_json)
-            ]
-        return await self._serialize_posts(db, posts[:normalized_limit])
+            stmt = stmt.where(
+                or_(
+                    Post.symbol == normalized_symbol,
+                    Post.symbols_json.contains([normalized_symbol]),
+                )
+            )
+        rows = (await db.execute(stmt)).all()
+        return await self._serialize_post_rows(db, rows)
 
     async def get_post(self, db: AsyncSession, post_id: str) -> CommunityPostResponse:
-        post = await db.get(Post, post_id.strip())
-        if post is None:
+        normalized_post_id = post_id.strip()
+        if not normalized_post_id:
             raise self._not_found("Post not found.")
-        rows = await self._serialize_posts(db, [post])
+        row = (
+            await db.execute(
+                select(Post, User, CommunityProfile)
+                .join(User, User.id == Post.author_id)
+                .outerjoin(CommunityProfile, CommunityProfile.uid == Post.author_id)
+                .where(Post.id == normalized_post_id)
+                .limit(1)
+            )
+        ).first()
+        if row is None:
+            raise self._not_found("Post not found.")
+        rows = await self._serialize_post_rows(db, [row])
         if not rows:
             raise self._not_found("Post not found.")
         return rows[0]
@@ -143,17 +155,17 @@ class CommunityService:
         normalized_uid = author_uid.strip()
         if not normalized_uid:
             return []
-        posts = list(
-            (
-                await db.scalars(
-                    select(Post)
-                    .where(Post.author_id == normalized_uid)
-                    .order_by(Post.created_at.desc(), Post.id.desc())
-                    .limit(max(1, min(limit, 100)))
-                )
-            ).all()
-        )
-        return await self._serialize_posts(db, posts)
+        rows = (
+            await db.execute(
+                select(Post, User, CommunityProfile)
+                .join(User, User.id == Post.author_id)
+                .outerjoin(CommunityProfile, CommunityProfile.uid == Post.author_id)
+                .where(Post.author_id == normalized_uid)
+                .order_by(Post.created_at.desc(), Post.id.desc())
+                .limit(max(1, min(limit, 100)))
+            )
+        ).all()
+        return await self._serialize_post_rows(db, rows)
 
     async def list_comments(
         self,
@@ -165,17 +177,17 @@ class CommunityService:
         normalized_post_id = post_id.strip()
         if not normalized_post_id:
             return []
-        comments = list(
-            (
-                await db.scalars(
-                    select(Comment)
-                    .where(Comment.post_id == normalized_post_id)
-                    .order_by(Comment.created_at.desc(), Comment.id.desc())
-                    .limit(max(1, min(limit, 120)))
-                )
-            ).all()
-        )
-        return await self._serialize_comments(db, comments)
+        rows = (
+            await db.execute(
+                select(Comment, User, CommunityProfile)
+                .join(User, User.id == Comment.author_id)
+                .outerjoin(CommunityProfile, CommunityProfile.uid == Comment.author_id)
+                .where(Comment.post_id == normalized_post_id)
+                .order_by(Comment.created_at.desc(), Comment.id.desc())
+                .limit(max(1, min(limit, 120)))
+            )
+        ).all()
+        return await self._serialize_comment_rows(db, rows)
 
     async def list_comments_by_author(
         self,
@@ -187,19 +199,19 @@ class CommunityService:
         normalized_uid = author_uid.strip()
         if not normalized_uid:
             return []
-        comments = list(
-            (
-                await db.scalars(
-                    select(Comment)
-                    .where(Comment.author_id == normalized_uid)
-                    .order_by(Comment.created_at.desc(), Comment.id.desc())
-                    .limit(max(1, min(limit, 120)))
-                )
-            ).all()
-        )
-        return await self._serialize_comments(db, comments)
+        rows = (
+            await db.execute(
+                select(Comment, User, CommunityProfile)
+                .join(User, User.id == Comment.author_id)
+                .outerjoin(CommunityProfile, CommunityProfile.uid == Comment.author_id)
+                .where(Comment.author_id == normalized_uid)
+                .order_by(Comment.created_at.desc(), Comment.id.desc())
+                .limit(max(1, min(limit, 120)))
+            )
+        ).all()
+        return await self._serialize_comment_rows(db, rows)
 
-    async def get_reaction(self, db: AsyncSession, *, post_id: str, user_uid: str) -> str | None:
+    async def get_reaction(self, db: AsyncSession, *, post_id: str, user_uid: str) -> int | None:
         normalized_post_id = post_id.strip()
         normalized_user_id = user_uid.strip()
         if not normalized_post_id or not normalized_user_id:
@@ -210,7 +222,7 @@ class CommunityService:
                 PostReaction.user_id == normalized_user_id,
             )
         )
-        return normalize_reaction_key(reaction)
+        return normalize_reaction_code(reaction)
 
     async def get_profile(self, db: AsyncSession, uid: str) -> CommunityProfileResponse:
         user = await db.get(User, uid.strip())
@@ -225,30 +237,27 @@ class CommunityService:
         *,
         limit: int,
     ) -> list[CommunityProfileResponse]:
-        users = list(
+        membership_priority = case(
+            (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
             (
-                await db.scalars(
-                    select(User)
-                    .order_by(
-                        desc(
-                            case(
-                                (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
-                                (
-                                    (User.membership_tier == MEMBERSHIP_TIER_PRO)
-                                    | (User.is_pro.is_(True)),
-                                    1,
-                                ),
-                                else_=0,
-                            )
-                        ),
-                        desc(User.updated_at),
-                        desc(User.created_at),
-                    )
-                    .limit(max(1, min(limit, 100)))
-                )
-            ).all()
+                (User.membership_tier == MEMBERSHIP_TIER_PRO) | (User.is_pro.is_(True)),
+                1,
+            ),
+            else_=0,
         )
-        return await self._serialize_profiles(db, users)
+        rows = (
+            await db.execute(
+                select(User, CommunityProfile)
+                .outerjoin(CommunityProfile, CommunityProfile.uid == User.id)
+                .order_by(
+                    desc(membership_priority),
+                    desc(User.updated_at),
+                    desc(User.created_at),
+                )
+                .limit(max(1, min(limit, 100)))
+            )
+        ).all()
+        return self._serialize_profile_rows(rows)
 
     async def search_profiles(
         self,
@@ -258,33 +267,39 @@ class CommunityService:
         limit: int,
     ) -> list[CommunityProfileResponse]:
         normalized_query = query.strip().lower()
-        users = list(
+        membership_priority = case(
+            (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
             (
-                await db.scalars(
-                    select(User)
-                    .order_by(
-                        desc(
-                            case(
-                                (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
-                                (
-                                    (User.membership_tier == MEMBERSHIP_TIER_PRO)
-                                    | (User.is_pro.is_(True)),
-                                    1,
-                                ),
-                                else_=0,
-                            )
-                        ),
-                        desc(User.updated_at),
-                        desc(User.created_at),
-                    )
-                    .limit(200)
-                )
-            ).all()
+                (User.membership_tier == MEMBERSHIP_TIER_PRO) | (User.is_pro.is_(True)),
+                1,
+            ),
+            else_=0,
         )
-        profiles = await self._serialize_profiles(db, users)
+        stmt = (
+            select(User, CommunityProfile)
+            .outerjoin(CommunityProfile, CommunityProfile.uid == User.id)
+            .order_by(
+                desc(membership_priority),
+                desc(User.updated_at),
+                desc(User.created_at),
+            )
+            .limit(120)
+        )
+        tokens = [token for token in normalized_query.split() if token]
+        for token in tokens:
+            like = f"%{token}%"
+            stmt = stmt.where(
+                or_(
+                    User.display_name.ilike(like),
+                    User.username.ilike(like),
+                    CommunityProfile.display_name.ilike(like),
+                    CommunityProfile.username.ilike(like),
+                )
+            )
+        rows = (await db.execute(stmt)).all()
+        profiles = self._serialize_profile_rows(rows)
         if not normalized_query:
             return profiles[: max(1, min(limit, 50))]
-        tokens = [token for token in normalized_query.split() if token]
         if not tokens:
             return profiles[: max(1, min(limit, 50))]
         filtered = [
@@ -436,8 +451,7 @@ class CommunityService:
         await db.commit()
 
         if self._notifications is not None:
-            notification = await self._notifications.create_notification(
-                db,
+            self._notifications.queue_notification(
                 user_id=normalized_target_uid,
                 kind="community_follow",
                 title="New follower",
@@ -445,7 +459,6 @@ class CommunityService:
                 actor_uid=actor.id,
                 post_id=None,
             )
-            await self._publish_notification(db, normalized_target_uid, notification)
 
     async def unfollow(
         self,
@@ -858,6 +871,26 @@ class CommunityService:
             if users.get(post.author_id) is not None
         ]
 
+    async def _serialize_post_rows(
+        self,
+        db: AsyncSession,
+        rows,
+    ) -> list[CommunityPostResponse]:
+        if not rows:
+            return []
+        posts = [post for post, _, _ in rows]
+        counts = await self._load_post_reaction_counts(db, [post.id for post in posts])
+        return [
+            self._responses.post_response(
+                post,
+                user,
+                profile,
+                counts.get(post.id, empty_reaction_counts()),
+            )
+            for post, user, profile in rows
+            if user is not None
+        ]
+
     async def _serialize_comments(
         self,
         db: AsyncSession,
@@ -888,6 +921,26 @@ class CommunityService:
             if users.get(comment.author_id) is not None
         ]
 
+    async def _serialize_comment_rows(
+        self,
+        db: AsyncSession,
+        rows,
+    ) -> list[CommunityCommentResponse]:
+        if not rows:
+            return []
+        comments = [comment for comment, _, _ in rows]
+        counts = await self._load_comment_reaction_counts(db, [comment.id for comment in comments])
+        return [
+            self._responses.comment_response(
+                comment,
+                user,
+                profile,
+                counts.get(comment.id, {}),
+            )
+            for comment, user, profile in rows
+            if user is not None
+        ]
+
     async def _serialize_profiles(
         self,
         db: AsyncSession,
@@ -905,6 +958,14 @@ class CommunityService:
         return [
             self._responses.profile_response(user, profiles.get(user.id))
             for user in users
+        ]
+
+    def _serialize_profile_rows(self, rows) -> list[CommunityProfileResponse]:
+        if not rows:
+            return []
+        return [
+            self._responses.profile_response(user, profile)
+            for user, profile in rows
         ]
 
     async def _ensure_profile(self, db: AsyncSession, user: User) -> CommunityProfile:
@@ -992,22 +1053,57 @@ class CommunityService:
         self,
         db: AsyncSession,
         post_ids: list[str],
-    ) -> dict[str, dict[str, int]]:
+    ) -> dict[str, dict[int, int]]:
         if not post_ids:
             return {}
+        normalized_post_ids = [post_id.strip() for post_id in post_ids if post_id and post_id.strip()]
+        if not normalized_post_ids:
+            return {}
+        grouped = {post_id: empty_reaction_counts() for post_id in normalized_post_ids}
+        missing_post_ids = list(normalized_post_ids)
+
+        if self._cache is not None:
+            cached = await self._cache.get_post_reaction_counts_many(normalized_post_ids)
+            if cached:
+                missing_post_ids = []
+                for post_id in normalized_post_ids:
+                    raw_counts = cached.get(post_id)
+                    if raw_counts is None:
+                        missing_post_ids.append(post_id)
+                        continue
+                    next_counts = empty_reaction_counts()
+                    for reaction_type, count in raw_counts.items():
+                        reaction_code = normalize_reaction_code(reaction_type)
+                        if reaction_code is None:
+                            continue
+                        next_counts[reaction_code] = max(0, int(count))
+                    grouped[post_id] = next_counts
+
+        if not missing_post_ids:
+            return grouped
+
         rows = (
             await db.execute(
                 select(PostReaction.post_id, PostReaction.reaction_type, func.count(PostReaction.id))
-                .where(PostReaction.post_id.in_(post_ids))
+                .where(PostReaction.post_id.in_(missing_post_ids))
                 .group_by(PostReaction.post_id, PostReaction.reaction_type)
             )
         ).all()
-        grouped = {post_id: empty_reaction_counts() for post_id in post_ids}
         for post_id, reaction_type, count in rows:
-            reaction_key = normalize_reaction_key(reaction_type)
-            if reaction_key is None:
+            reaction_code = normalize_reaction_code(reaction_type)
+            if reaction_code is None:
                 continue
-            grouped.setdefault(post_id, empty_reaction_counts())[reaction_key] = int(count)
+            grouped.setdefault(post_id, empty_reaction_counts())[reaction_code] = int(count)
+        if self._cache is not None:
+            for post_id in missing_post_ids:
+                await self._cache.set_post_reaction_counts(
+                    post_id,
+                    {
+                        str(code): int(count)
+                        for code, count in grouped.get(post_id, empty_reaction_counts()).items()
+                        if int(count) > 0
+                    },
+                )
         return grouped
 
     async def _load_comment_reaction_counts(
@@ -1061,8 +1157,7 @@ class CommunityService:
         for follower_id in follower_ids:
             if follower_id == actor.id:
                 continue
-            notification = await self._notifications.create_notification(
-                db,
+            self._notifications.queue_notification(
                 user_id=follower_id,
                 kind="community_post",
                 title="New community post",
@@ -1070,7 +1165,6 @@ class CommunityService:
                 actor_uid=actor.id,
                 post_id=post.id,
             )
-            await self._publish_notification(db, follower_id, notification)
 
     async def _publish_notification(self, db: AsyncSession, user_id: str, notification) -> None:
         if self._bus is None or self._notifications is None:

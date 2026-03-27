@@ -1,0 +1,22 @@
+{
+  "targetConnections": 1000,
+  "attempted": 1000,
+  "connected": 484,
+  "connectFailed": 300,
+  "closed": 484,
+  "activeAtEnd": 0,
+  "sentMessages": 968,
+  "receivedMessages": 2,
+  "durationSeconds": 25.44,
+  "connectLatencyMs": {
+    "p50": 96.85,
+    "p95": 126.51,
+    "p99": 133.7,
+    "max": 140.16
+  },
+  "backendMetrics": {},
+  "errors": {
+    "InvalidMessage": 50,
+    "ConnectionRefusedError": 250
+  }
+}

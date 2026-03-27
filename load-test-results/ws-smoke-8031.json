@@ -1,0 +1,22 @@
+{
+  "targetConnections": 100,
+  "attempted": 31,
+  "connected": 20,
+  "connectFailed": 11,
+  "closed": 20,
+  "activeAtEnd": 0,
+  "sentMessages": 2000,
+  "receivedMessages": 61,
+  "durationSeconds": 33.42,
+  "connectLatencyMs": {
+    "p50": 3.36,
+    "p95": 4.82,
+    "p99": 26.55,
+    "max": 26.55
+  },
+  "backendMetrics": {},
+  "errors": {
+    "InvalidStatus": 9,
+    "TimeoutError": 2
+  }
+}

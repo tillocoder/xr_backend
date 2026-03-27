@@ -7,6 +7,7 @@ from app.presentation.api.json_cache import JsonRouteCache
 from app.presentation.api.request_state import (
     get_bus as get_request_bus,
     get_notification_service,
+    get_optional_cache,
     get_public_base_url as get_request_public_base_url,
     get_ws_manager,
 )
@@ -52,6 +53,7 @@ from app.services.chat_service import (
     send_voice_message_to_peer,
     update_message_for_user,
 )
+from app.services.community_support import normalize_reaction_key
 from app.services.community_service import CommunityService
 from app.services.feed_service import load_feed_page
 from app.services.reaction_service import react_to_post
@@ -63,7 +65,7 @@ _COMMUNITY_PUBLIC_CACHE = JsonRouteCache(
     ttl_setting_name="community_public_cache_ttl_seconds",
     default_ttl_seconds=20,
     min_ttl_seconds=10,
-    max_ttl_seconds=45,
+    max_ttl_seconds=60,
 )
 
 
@@ -71,6 +73,7 @@ def _community_service(request: Request) -> CommunityService:
     return CommunityService(
         notification_service=get_notification_service(request),
         bus=get_request_bus(request),
+        cache=get_optional_cache(request),
         public_base_url=_public_base_url(request),
     )
 
@@ -91,6 +94,102 @@ async def _invalidate_community_public_cache(
         await _COMMUNITY_PUBLIC_CACHE.delete_prefix(
             request,
             _community_public_cache_key(request, *group),
+        )
+
+
+def _reaction_counts_payload(raw_counts: dict[int, int]) -> dict[str, int]:
+    return {
+        str(int(code)): max(0, int(count))
+        for code, count in raw_counts.items()
+        if int(count) > 0
+    }
+
+
+def _patch_post_payload(
+    payload: dict | list,
+    *,
+    post_id: str,
+    reaction_counts: dict[int, int] | None = None,
+    comment_delta: int = 0,
+    view_delta: int = 0,
+) -> dict | list | None:
+    normalized_post_id = post_id.strip()
+    if not normalized_post_id:
+        return None
+
+    reaction_payload = (
+        _reaction_counts_payload(reaction_counts)
+        if reaction_counts is not None
+        else None
+    )
+    changed = False
+
+    def patch_item(item: object) -> object:
+        nonlocal changed
+        if not isinstance(item, dict):
+            return item
+        if str(item.get("id", "")).strip() != normalized_post_id:
+            return item
+        next_item = dict(item)
+        if reaction_payload is not None and next_item.get("reactionCounts") != reaction_payload:
+            next_item["reactionCounts"] = reaction_payload
+        if comment_delta:
+            next_item["commentCount"] = max(
+                0,
+                int(next_item.get("commentCount", 0)) + int(comment_delta),
+            )
+        if view_delta:
+            next_item["viewCount"] = max(
+                0,
+                int(next_item.get("viewCount", 0)) + int(view_delta),
+            )
+        if next_item != item:
+            changed = True
+        return next_item
+
+    if isinstance(payload, dict):
+        patched = patch_item(payload)
+        return patched if changed else None
+    if isinstance(payload, list):
+        patched = [patch_item(item) for item in payload]
+        return patched if changed else None
+    return None
+
+
+async def _patch_cached_post_payloads(
+    request: Request,
+    *,
+    post_id: str,
+    author_uid: str | None = None,
+    reaction_counts: dict[int, int] | None = None,
+    comment_delta: int = 0,
+    view_delta: int = 0,
+) -> None:
+    def patcher(payload: dict | list) -> dict | list | None:
+        return _patch_post_payload(
+            payload,
+            post_id=post_id,
+            reaction_counts=reaction_counts,
+            comment_delta=comment_delta,
+            view_delta=view_delta,
+        )
+
+    await _COMMUNITY_PUBLIC_CACHE.patch_exact(
+        request,
+        _community_public_cache_key(request, "post", post_id),
+        patcher,
+    )
+    await _COMMUNITY_PUBLIC_CACHE.patch_prefix(
+        request,
+        _community_public_cache_key(request, "posts"),
+        patcher,
+    )
+    normalized_author_uid = (author_uid or "").strip()
+    if normalized_author_uid:
+        await _COMMUNITY_PUBLIC_CACHE.patch_prefix(
+            request,
+            _community_public_cache_key(request, "profile-posts", normalized_author_uid),
+            patcher,
         )
 
 
@@ -158,9 +257,12 @@ async def get_post_reaction(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> dict[str, str | None]:
+) -> dict[str, int | str | None]:
     reaction = await _community_service(request).get_reaction(db, post_id=post_id, user_uid=user.id)
-    return {"reactionKey": reaction}
+    return {
+        "reactionIndex": reaction,
+        "reactionKey": normalize_reaction_key(reaction),
+    }
 
 
 @router.post("/posts", response_model=CommunityPostResponse, status_code=status.HTTP_201_CREATED)
@@ -234,10 +336,10 @@ async def register_post_view(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _community_service(request).register_post_view(db, current_user_id=user.id, post_id=post_id)
-    await _invalidate_community_public_cache(
+    await _patch_cached_post_payloads(
         request,
-        ("posts",),
-        ("post", post_id),
+        post_id=post_id,
+        view_delta=1,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -278,10 +380,13 @@ async def add_comment(
         post_id=post_id,
         payload=payload,
     )
+    await _patch_cached_post_payloads(
+        request,
+        post_id=post_id,
+        comment_delta=1,
+    )
     await _invalidate_community_public_cache(
         request,
-        ("posts",),
-        ("post", post_id),
         ("post-comments", post_id),
         ("profile-comments",),
     )
@@ -939,12 +1044,13 @@ async def post_reaction(
         bus=bus,
         post_id=post_id,
         user_id=user.id,
-        reaction_type=payload.reactionKey,
+        reaction_code=payload.reactionIndex if payload.reactionIndex is not None else payload.reactionKey,
         notification_service=get_notification_service(request),
     )
-    await _invalidate_community_public_cache(
+    await _patch_cached_post_payloads(
         request,
-        ("posts",),
-        ("post", post_id),
+        post_id=post_id,
+        author_uid=response.authorUid,
+        reaction_counts=response.reactionCounts,
     )
     return response

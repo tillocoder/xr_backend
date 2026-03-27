@@ -24,9 +24,15 @@ class Settings(BaseSettings):
     database_max_overflow: int = 20
     database_pool_timeout_seconds: int = 30
     database_pool_recycle_seconds: int = 1800
+    process_worker_count: int = 1
     redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_required_for_runtime: bool = False
     redis_socket_connect_timeout_seconds: float = 0.35
     redis_socket_timeout_seconds: float = 0.35
+    redis_retry_after_seconds: float = 15.0
+    redis_retry_after_max_seconds: float = 300.0
+    redis_pubsub_reconnect_delay_seconds: float = 1.0
+    redis_pubsub_reconnect_max_delay_seconds: float = 30.0
     request_log_level: str = "INFO"
     gzip_minimum_size_bytes: int = 1024
     metrics_enabled: bool = True
@@ -35,10 +41,18 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     rate_limit_max_requests_per_ip: int = 120
     rate_limit_max_requests_per_user: int = 240
+    rate_limit_read_max_requests_per_ip: int = 600
+    rate_limit_read_max_requests_per_user: int = 1200
     websocket_rate_limit_enabled: bool = True
     websocket_rate_limit_max_connects_per_ip: int = 20
     websocket_rate_limit_max_messages_per_ip: int = 180
     websocket_rate_limit_max_messages_per_user: int = 240
+    websocket_send_timeout_seconds: float = 5.0
+    websocket_max_pending_messages_per_connection: int = 128
+    websocket_max_rooms_per_connection: int = 64
+    websocket_max_topics_per_connection: int = 256
+    websocket_presence_ttl_seconds: int = 90
+    websocket_presence_refresh_interval_seconds: int = 20
     cors_allow_origins: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
@@ -52,6 +66,8 @@ class Settings(BaseSettings):
     feed_default_limit: int = 20
     feed_max_limit: int = 50
     news_cache_ttl_seconds: int = 120
+    news_related_cache_ttl_seconds: int = 300
+    news_revision_cache_ttl_seconds: int = 30
     cryptopanic_api_token: str = ""
     ws_heartbeat_seconds: int = 25
     auto_create_schema: bool = False
@@ -67,6 +83,7 @@ class Settings(BaseSettings):
     market_poll_interval_seconds: int = 45
     market_cache_ttl_seconds: int = 75
     market_tracked_limit: int = 20
+    community_public_cache_ttl_seconds: int = 45
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
@@ -125,6 +142,10 @@ class Settings(BaseSettings):
     @property
     def admin_features_enabled(self) -> bool:
         return self.admin_panel_enabled and self.admin_panel_has_secure_credentials
+
+    @property
+    def coordinated_runtime_services_enabled(self) -> bool:
+        return self.redis_required_for_runtime or self.process_worker_count <= 1
 
 
 @lru_cache

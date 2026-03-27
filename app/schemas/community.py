@@ -54,7 +54,7 @@ class CommunityPostResponse(BaseModel):
     poll: CommunityPollResponse | None = None
     commentCount: int = 0
     viewCount: int = 0
-    reactionCounts: dict[str, int] = Field(default_factory=dict)
+    reactionCounts: dict[int, int] = Field(default_factory=dict)
     createdAt: datetime | None = None
 
 
@@ -128,12 +128,17 @@ class CommunityImageUploadResponse(BaseModel):
 
 
 class PostReactionChangeIn(BaseModel):
-    reactionKey: str
+    reactionIndex: int | None = None
+    reactionKey: str | None = None
+    currentReactionIndex: int | None = None
     currentReaction: str | None = None
 
 
 class PostReactionStateOut(BaseModel):
     postId: str
-    reaction: str | None
-    reactionCounts: dict[str, int]
+    authorUid: str | None = None
+    reaction: str | None = None
+    reactionKey: str | None = None
+    reactionIndex: int | None = None
+    reactionCounts: dict[int, int]
     updatedAt: datetime

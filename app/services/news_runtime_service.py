@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import logging
 from datetime import datetime, timezone
 
@@ -11,6 +9,10 @@ from app.db.session import SessionLocal
 from app.models.entities import PushToken, User
 from app.schemas.ws import WsEnvelope
 from app.services.firebase_push_service import FirebasePushService
+from app.services.db_runtime_lock_service import (
+    release_session_advisory_lock,
+    try_acquire_session_advisory_lock,
+)
 from app.services.news_query_service import (
     StoredNewsEntry,
     load_pending_notification_entries,
@@ -18,10 +20,14 @@ from app.services.news_query_service import (
     squash_pending_notification_backlog,
 )
 from app.services.news_release_service import run_news_pipeline
+from app.services.periodic_runtime_service import PeriodicRuntimeService
 from app.services.push_token_service import PushTokenService
+from app.services.runtime_lease_service import RuntimeLeaseService
 from app.ws.bus import RedisEventBus
 
 logger = logging.getLogger(__name__)
+
+_NEWS_RUNTIME_DB_LOCK_KEY = 60241611
 
 
 def _utc_now() -> datetime:
@@ -36,83 +42,88 @@ def _notification_body_from_summary(summary: str, source: str) -> str:
     return str(source or "XR HODL").strip() or "XR HODL"
 
 
-class NewsRuntimeService:
+class NewsRuntimeService(PeriodicRuntimeService):
     def __init__(
         self,
         *,
         bus: RedisEventBus,
         firebase_push_service: FirebasePushService,
         push_token_service: PushTokenService,
+        lease_service: RuntimeLeaseService,
         poll_interval_seconds: int = 30 * 60,
         max_notifications_per_cycle: int = 1,
     ) -> None:
+        super().__init__()
         self._bus = bus
         self._firebase_push = firebase_push_service
         self._push_token_service = push_token_service
+        self._lease_service = lease_service
         self._poll_interval_seconds = max(60, int(poll_interval_seconds))
         self._max_notifications_per_cycle = max(1, int(max_notifications_per_cycle))
-        self._task: asyncio.Task | None = None
-        self._started = False
 
-    async def start(self) -> None:
-        if self._started:
+    @property
+    def poll_interval_seconds(self) -> int:
+        return self._poll_interval_seconds
+
+    async def run_cycle(self) -> None:
+        lease = await self._lease_service.acquire(
+            "runtime:news:cycle",
+            ttl_seconds=max(self._poll_interval_seconds, 300),
+        )
+        if lease is None:
             return
-        self._started = True
-        self._task = asyncio.create_task(self._run_loop())
-
-    async def stop(self) -> None:
-        task = self._task
-        self._task = None
-        if task is not None:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-
-    async def _run_loop(self) -> None:
         try:
-            while True:
-                await self._refresh_once()
-                await asyncio.sleep(self._poll_interval_seconds)
-        except asyncio.CancelledError:
-            raise
-
-    async def _refresh_once(self) -> None:
-        async with SessionLocal() as db:
-            try:
-                await run_news_pipeline(db)
-                await squash_pending_notification_backlog(
+            async with SessionLocal() as db:
+                lock_acquired = await try_acquire_session_advisory_lock(
                     db,
-                    keep=self._max_notifications_per_cycle,
-                    now=_utc_now(),
+                    _NEWS_RUNTIME_DB_LOCK_KEY,
+                    lock_name="runtime:news:cycle",
                 )
-                pending_entries = await load_pending_notification_entries(
-                    db,
-                    limit=self._max_notifications_per_cycle,
-                )
-            except Exception:
-                await db.rollback()
-                logger.exception("news_runtime_cycle_failed")
-                return
-
-            sent_article_ids: list[int] = []
-            for entry in pending_entries:
+                if not lock_acquired:
+                    return
                 try:
-                    await self._publish_update(entry)
-                    await self._push_update(entry)
-                except Exception:
-                    logger.exception(
-                        "news_runtime_delivery_failed",
-                        extra={"article_id": entry.article_id, "source": entry.source},
-                    )
-                    continue
-                sent_article_ids.append(entry.article_id)
+                    try:
+                        await run_news_pipeline(db)
+                        await squash_pending_notification_backlog(
+                            db,
+                            keep=self._max_notifications_per_cycle,
+                            now=_utc_now(),
+                        )
+                        pending_entries = await load_pending_notification_entries(
+                            db,
+                            limit=self._max_notifications_per_cycle,
+                        )
+                    except Exception:
+                        await db.rollback()
+                        logger.exception("news_runtime_cycle_failed")
+                        return
 
-            if sent_article_ids:
-                await mark_news_entries_notified(
-                    db,
-                    article_ids=sent_article_ids,
-                    now=_utc_now(),
-                )
+                    sent_article_ids: list[int] = []
+                    for entry in pending_entries:
+                        try:
+                            await self._publish_update(entry)
+                            await self._push_update(entry)
+                        except Exception:
+                            logger.exception(
+                                "news_runtime_delivery_failed",
+                                extra={"article_id": entry.article_id, "source": entry.source},
+                            )
+                            continue
+                        sent_article_ids.append(entry.article_id)
+
+                    if sent_article_ids:
+                        await mark_news_entries_notified(
+                            db,
+                            article_ids=sent_article_ids,
+                            now=_utc_now(),
+                        )
+                finally:
+                    await release_session_advisory_lock(
+                        db,
+                        _NEWS_RUNTIME_DB_LOCK_KEY,
+                    )
+        finally:
+            await lease.release()
 
     async def _publish_update(self, entry: StoredNewsEntry) -> None:
         payload = entry.to_event_payload()

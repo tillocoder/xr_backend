@@ -317,8 +317,13 @@ DAILY_MAX_FETCH_CYCLES = 24
 RETENTION_DAYS = 10
 TRANSLATE_BACKFILL_MIN_INTERVAL_SECONDS = 30 * 60
 MAX_RELEASED_ARTICLES = 100
-MAX_STORED_ARTICLES = 150
+MAX_STORED_ARTICLES = 420
 MAX_UNRELEASED_ARTICLES = MAX_STORED_ARTICLES - MAX_RELEASED_ARTICLES
+MAX_NATIVE_APP_LANG_UNRELEASED_ARTICLES = min(120, MAX_UNRELEASED_ARTICLES)
+MAX_GENERAL_UNRELEASED_ARTICLES = max(
+    0,
+    MAX_UNRELEASED_ARTICLES - MAX_NATIVE_APP_LANG_UNRELEASED_ARTICLES,
+)
 INGEST_MAX_ITEMS_PER_FEED = 10
 DUPLICATE_LOOKBACK_HOURS = 48
 DUPLICATE_CANDIDATE_LIMIT = 50
@@ -2413,19 +2418,38 @@ async def _trim_stored_articles(db: AsyncSession, *, keep: int) -> int:
     ).all()
     stale_ids.update(int(article_id) for article_id in released_ids)
 
-    unreleased_ids = (
+    native_keep = min(MAX_NATIVE_APP_LANG_UNRELEASED_ARTICLES, keep_unreleased)
+    general_keep = min(MAX_GENERAL_UNRELEASED_ARTICLES, keep_unreleased)
+    if native_keep + general_keep > keep_unreleased:
+        general_keep = max(0, keep_unreleased - native_keep)
+
+    native_unreleased_ids = (
         await db.scalars(
             select(NewsArticle.id)
             .where(NewsArticle.released_at.is_(None))
+            .where(NewsArticle.source.in_(NATIVE_APP_LANG_SOURCES))
             .order_by(
-                native_priority,
                 func.coalesce(NewsArticle.published_at, NewsArticle.created_at).desc(),
                 NewsArticle.id.desc(),
             )
-            .offset(keep_unreleased)
+            .offset(native_keep)
         )
     ).all()
-    stale_ids.update(int(article_id) for article_id in unreleased_ids)
+    stale_ids.update(int(article_id) for article_id in native_unreleased_ids)
+
+    general_unreleased_ids = (
+        await db.scalars(
+            select(NewsArticle.id)
+            .where(NewsArticle.released_at.is_(None))
+            .where(~NewsArticle.source.in_(NATIVE_APP_LANG_SOURCES))
+            .order_by(
+                func.coalesce(NewsArticle.published_at, NewsArticle.created_at).desc(),
+                NewsArticle.id.desc(),
+            )
+            .offset(general_keep)
+        )
+    ).all()
+    stale_ids.update(int(article_id) for article_id in general_unreleased_ids)
 
     overflow_ids = (
         await db.scalars(
