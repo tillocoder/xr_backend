@@ -1,8 +1,0 @@
-{"timestamp": "2026-03-25T17:16:00.604884+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Started server process [3032]"}
-{"timestamp": "2026-03-25T17:16:00.606146+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Waiting for application startup."}
-{"timestamp": "2026-03-25T17:16:00.756025+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Application startup complete."}
-{"timestamp": "2026-03-25T17:16:00.759054+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"}
-{"timestamp": "2026-03-25T17:16:10.336114+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:56863 - \"GET /api/v1/health HTTP/1.1\" 200"}
-{"timestamp": "2026-03-25T17:16:10.337934+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "0976be9b44e645a78356fa67bd23aee2", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 2.12, "clientIp": "127.0.0.1"}
-{"timestamp": "2026-03-25T17:16:27.091665+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:60283 - \"GET /api/v1/health HTTP/1.1\" 200"}
-{"timestamp": "2026-03-25T17:16:27.093567+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "54a6280d22e94abda321a5fc8e1fc31f", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 365.88, "clientIp": "127.0.0.1"}
