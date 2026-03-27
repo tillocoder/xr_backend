@@ -1,0 +1,347 @@
+C:\backend\run_prod.py:32: DeprecationWarning: 'asyncio.WindowsSelectorEventLoopPolicy' is deprecated and slated for removal in Python 3.16
+  asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+C:\backend\run_prod.py:32: DeprecationWarning: 'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16
+  asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+{"timestamp": "2026-03-26T11:50:19.915701+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Started server process [1980]"}
+{"timestamp": "2026-03-26T11:50:19.917580+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Waiting for application startup."}
+{"timestamp": "2026-03-26T11:50:20.029543+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Application startup complete."}
+{"timestamp": "2026-03-26T11:50:20.030938+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Uvicorn running on http://127.0.0.1:8016 (Press CTRL+C to quit)"}
+{"timestamp": "2026-03-26T11:50:20.380020+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:20.380954+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:50:20.747107+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:50:21.627843+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51240 - \"GET /api/v1/health HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:50:21.629304+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "a7c1ecceba2b40618e937f1d7e0cd927", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 567.19, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:50:22.381081+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:24.761939+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:29.141868+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:33.457709+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51359 - \"GET /api/v1/health HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:50:33.459558+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "1cd47c59f3e140a68b77eb666d86d468", "method": "GET", "path": "/api/v1/health", "route": "/api/v1/health", "statusCode": 200, "durationMs": 2.3, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:50:37.507070+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:47.341884+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51482 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:50:47.343061+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "9bab618966b64c299369ae58501d46a5", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 5.06, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:50:47.687743+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51481 - \"WebSocket /api/v1/ws?user_id=load-user-000000\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:47.690544+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:47.721169+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51492 - \"WebSocket /api/v1/ws?user_id=load-user-000005\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:47.722373+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:47.799668+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51493 - \"WebSocket /api/v1/ws?user_id=load-user-000006\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:47.800749+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:47.878858+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51496 - \"WebSocket /api/v1/ws?user_id=load-user-000007\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:47.879799+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:47.958386+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51499 - \"WebSocket /api/v1/ws?user_id=load-user-000008\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:47.959335+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.036623+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51500 - \"WebSocket /api/v1/ws?user_id=load-user-000009\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.037867+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.050563+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51484 - \"WebSocket /api/v1/ws?user_id=load-user-000001\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.052023+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.114960+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51503 - \"WebSocket /api/v1/ws?user_id=load-user-000010\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.115883+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.193867+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51504 - \"WebSocket /api/v1/ws?user_id=load-user-000011\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.194813+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.273021+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51507 - \"WebSocket /api/v1/ws?user_id=load-user-000012\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.274154+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.351023+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51508 - \"WebSocket /api/v1/ws?user_id=load-user-000013\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.351997+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.411490+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51485 - \"WebSocket /api/v1/ws?user_id=load-user-000002\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.412926+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.429417+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51510 - \"WebSocket /api/v1/ws?user_id=load-user-000014\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.430365+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.525120+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51511 - \"WebSocket /api/v1/ws?user_id=load-user-000015\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.526131+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.602987+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51513 - \"WebSocket /api/v1/ws?user_id=load-user-000016\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.604320+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.681699+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51515 - \"WebSocket /api/v1/ws?user_id=load-user-000017\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.682943+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.760906+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51516 - \"WebSocket /api/v1/ws?user_id=load-user-000018\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.761909+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.762904+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51489 - \"WebSocket /api/v1/ws?user_id=load-user-000003\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.764192+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.839563+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51518 - \"WebSocket /api/v1/ws?user_id=load-user-000019\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.840690+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.916522+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51519 - \"WebSocket /api/v1/ws?user_id=load-user-000020\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.917446+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:48.996618+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51523 - \"WebSocket /api/v1/ws?user_id=load-user-000021\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:48.997684+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.074915+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51524 - \"WebSocket /api/v1/ws?user_id=load-user-000022\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.075904+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.119911+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51490 - \"WebSocket /api/v1/ws?user_id=load-user-000004\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.121522+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.154144+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51526 - \"WebSocket /api/v1/ws?user_id=load-user-000023\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.155714+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.232866+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51528 - \"WebSocket /api/v1/ws?user_id=load-user-000024\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.233853+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.311782+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51530 - \"WebSocket /api/v1/ws?user_id=load-user-000025\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.312706+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.405638+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51533 - \"WebSocket /api/v1/ws?user_id=load-user-000026\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.406905+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.483797+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51536 - \"WebSocket /api/v1/ws?user_id=load-user-000027\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.484709+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.562062+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51538 - \"WebSocket /api/v1/ws?user_id=load-user-000028\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.562979+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.641510+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51539 - \"WebSocket /api/v1/ws?user_id=load-user-000029\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.642452+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.720598+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51543 - \"WebSocket /api/v1/ws?user_id=load-user-000030\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.721606+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.797830+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51544 - \"WebSocket /api/v1/ws?user_id=load-user-000031\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.798767+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.876270+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51547 - \"WebSocket /api/v1/ws?user_id=load-user-000032\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.877260+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:49.955387+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51548 - \"WebSocket /api/v1/ws?user_id=load-user-000033\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:49.956493+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.035174+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51550 - \"WebSocket /api/v1/ws?user_id=load-user-000034\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.038321+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.113943+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51552 - \"WebSocket /api/v1/ws?user_id=load-user-000035\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.114822+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.192412+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51553 - \"WebSocket /api/v1/ws?user_id=load-user-000036\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.193243+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.271396+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51556 - \"WebSocket /api/v1/ws?user_id=load-user-000037\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.272565+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.349947+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51557 - \"WebSocket /api/v1/ws?user_id=load-user-000038\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.350849+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.444920+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51560 - \"WebSocket /api/v1/ws?user_id=load-user-000039\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.445792+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.523456+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51561 - \"WebSocket /api/v1/ws?user_id=load-user-000040\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.524332+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.603919+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51565 - \"WebSocket /api/v1/ws?user_id=load-user-000041\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.605174+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.681988+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51566 - \"WebSocket /api/v1/ws?user_id=load-user-000042\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.682827+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.761631+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51568 - \"WebSocket /api/v1/ws?user_id=load-user-000043\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.762524+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.840704+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51571 - \"WebSocket /api/v1/ws?user_id=load-user-000044\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.841621+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.922158+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51572 - \"WebSocket /api/v1/ws?user_id=load-user-000045\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.923278+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:50.995728+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51575 - \"WebSocket /api/v1/ws?user_id=load-user-000046\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:50.999414+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.072806+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51578 - \"WebSocket /api/v1/ws?user_id=load-user-000047\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.074969+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.152223+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51582 - \"WebSocket /api/v1/ws?user_id=load-user-000048\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.153424+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.244988+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51584 - \"WebSocket /api/v1/ws?user_id=load-user-000049\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.245930+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.323868+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51587 - \"WebSocket /api/v1/ws?user_id=load-user-000050\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.324789+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.403195+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51588 - \"WebSocket /api/v1/ws?user_id=load-user-000051\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.404551+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.482130+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51590 - \"WebSocket /api/v1/ws?user_id=load-user-000052\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.484400+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.559428+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51592 - \"WebSocket /api/v1/ws?user_id=load-user-000053\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.561147+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.639286+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51593 - \"WebSocket /api/v1/ws?user_id=load-user-000054\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.640299+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.716335+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51597 - \"WebSocket /api/v1/ws?user_id=load-user-000055\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.717722+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.794585+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51598 - \"WebSocket /api/v1/ws?user_id=load-user-000056\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.795490+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.873641+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51600 - \"WebSocket /api/v1/ws?user_id=load-user-000057\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.874662+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:51.953529+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51603 - \"WebSocket /api/v1/ws?user_id=load-user-000058\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:51.954718+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.045521+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51606 - \"WebSocket /api/v1/ws?user_id=load-user-000059\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.046465+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.123767+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51608 - \"WebSocket /api/v1/ws?user_id=load-user-000060\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.124676+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.203683+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51611 - \"WebSocket /api/v1/ws?user_id=load-user-000061\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.204887+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.281960+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51613 - \"WebSocket /api/v1/ws?user_id=load-user-000062\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.282948+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.364414+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51616 - \"WebSocket /api/v1/ws?user_id=load-user-000063\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.365458+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.371038+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51617 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:50:52.371929+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "f1a4d7c357704956b5c40cfccbfbc770", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 4.77, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:50:52.441161+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51618 - \"WebSocket /api/v1/ws?user_id=load-user-000064\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.442618+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.519328+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51619 - \"WebSocket /api/v1/ws?user_id=load-user-000065\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.520744+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.598538+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51621 - \"WebSocket /api/v1/ws?user_id=load-user-000066\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.600038+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.676181+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51623 - \"WebSocket /api/v1/ws?user_id=load-user-000067\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.677266+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.754480+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51626 - \"WebSocket /api/v1/ws?user_id=load-user-000068\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.755924+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.833668+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51627 - \"WebSocket /api/v1/ws?user_id=load-user-000069\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.834744+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.911516+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51630 - \"WebSocket /api/v1/ws?user_id=load-user-000070\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.912403+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:52.990333+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51632 - \"WebSocket /api/v1/ws?user_id=load-user-000071\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:52.991260+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.086636+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51633 - \"WebSocket /api/v1/ws?user_id=load-user-000072\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.087991+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.163328+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51636 - \"WebSocket /api/v1/ws?user_id=load-user-000073\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.164420+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.241849+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51637 - \"WebSocket /api/v1/ws?user_id=load-user-000074\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.242799+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.321269+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51640 - \"WebSocket /api/v1/ws?user_id=load-user-000075\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.322182+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.398955+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51642 - \"WebSocket /api/v1/ws?user_id=load-user-000076\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.400094+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.477869+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51645 - \"WebSocket /api/v1/ws?user_id=load-user-000077\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.478876+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.556713+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51646 - \"WebSocket /api/v1/ws?user_id=load-user-000078\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.557616+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.635724+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51648 - \"WebSocket /api/v1/ws?user_id=load-user-000079\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.636690+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.715258+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51651 - \"WebSocket /api/v1/ws?user_id=load-user-000080\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.716775+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.793231+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51652 - \"WebSocket /api/v1/ws?user_id=load-user-000081\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.794242+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.872021+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51655 - \"WebSocket /api/v1/ws?user_id=load-user-000082\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.872983+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:53.952162+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51656 - \"WebSocket /api/v1/ws?user_id=load-user-000083\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:53.953371+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.045329+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51658 - \"WebSocket /api/v1/ws?user_id=load-user-000084\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.046403+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.124046+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51660 - \"WebSocket /api/v1/ws?user_id=load-user-000085\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.125097+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.153330+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:50:54.203181+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51663 - \"WebSocket /api/v1/ws?user_id=load-user-000086\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.204147+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.281172+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51664 - \"WebSocket /api/v1/ws?user_id=load-user-000087\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.282420+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.359971+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51665 - \"WebSocket /api/v1/ws?user_id=load-user-000088\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.360946+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.437686+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51668 - \"WebSocket /api/v1/ws?user_id=load-user-000089\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.438604+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.519803+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51669 - \"WebSocket /api/v1/ws?user_id=load-user-000090\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.521004+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.591881+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51672 - \"WebSocket /api/v1/ws?user_id=load-user-000091\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.592916+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.671889+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51674 - \"WebSocket /api/v1/ws?user_id=load-user-000092\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.672820+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.765947+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51677 - \"WebSocket /api/v1/ws?user_id=load-user-000093\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.767291+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.844165+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51678 - \"WebSocket /api/v1/ws?user_id=load-user-000094\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.845070+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:54.922383+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51681 - \"WebSocket /api/v1/ws?user_id=load-user-000095\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:54.923315+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:55.001203+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51683 - \"WebSocket /api/v1/ws?user_id=load-user-000096\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:55.002398+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:55.079483+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51684 - \"WebSocket /api/v1/ws?user_id=load-user-000097\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:55.080756+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:55.158920+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51687 - \"WebSocket /api/v1/ws?user_id=load-user-000098\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:55.159959+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:55.239149+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "127.0.0.1:51690 - \"WebSocket /api/v1/ws?user_id=load-user-000099\" [accepted]"}
+{"timestamp": "2026-03-26T11:50:55.240042+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection open"}
+{"timestamp": "2026-03-26T11:50:57.397591+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51718 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:50:57.398574+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "e08aaab691d04f9aa0a4d7c0e45dacd8", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 5.66, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:51:02.413382+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:51794 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:51:02.414216+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "e1dea4a0a50e4a5f82aeba8e8a8cb229", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 3.33, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:51:06.623295+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:06.639001+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:06.764487+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:06.812742+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:06.876582+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:06.924673+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.191889+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.207466+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.239707+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.272086+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.364823+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.427346+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.521576+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.522862+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.663270+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.664083+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.897610+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:07.943983+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.197718+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.245057+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.260440+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.322932+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.510959+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.589471+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.605021+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.761626+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:08.776756+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.253625+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.254490+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.408328+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.424201+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.551647+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.629340+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.676411+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.803141+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:09.941886+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:10.335791+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:10.461672+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:10.555207+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:10.602598+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:10.995461+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.230993+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.294628+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.357406+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.561707+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.608082+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:11.686150+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:12.577955+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:12.657761+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:13.681910+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:14.530526+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:14.765956+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:15.190375+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:15.978602+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.054505+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.212564+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.602666+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.666374+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.730310+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.808531+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:16.886469+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:17.120225+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:17.120924+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:17.291746+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:17.619347+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.456841+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.472443+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.757310+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.913605+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.914434+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:18.928915+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.120092+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.120793+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.121428+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.135220+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.245852+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.498493+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.640151+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:19.671343+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:20.536601+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:20.613702+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:20.661899+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:20.742488+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.027236+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.168944+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.311014+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.406684+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.548729+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.755684+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.816407+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.817110+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.909827+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:21.941470+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:22.180572+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:23.035329+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:23.050585+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:23.634622+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:23.971295+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:24.088560+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:24.194839+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "connection closed"}
+{"timestamp": "2026-03-26T11:51:24.534887+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:51:44.092077+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:51:54.892224+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:52:00.657622+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:52576 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:52:00.658345+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "4587b9174d5a44dfb1fddc8894bc5c26", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 3.3, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:52:25.246393+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:52:25.933261+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:52878 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:52:25.933998+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "c0028716bc104ddbb76f355e15deca6f", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 3.27, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:52:55.634550+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:53:06.739479+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:53:26.003517+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:53:56.372943+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:54:05.768881+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:54:26.737414+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:54:51.497652+00:00", "level": "WARNING", "logger": "app.services.runtime_lease_service", "message": "runtime_lease_best_effort_fallback"}
+{"timestamp": "2026-03-26T11:54:57.102580+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}
+{"timestamp": "2026-03-26T11:55:13.425329+00:00", "level": "INFO", "logger": "uvicorn.access", "message": "127.0.0.1:52983 - \"GET /metrics HTTP/1.1\" 200"}
+{"timestamp": "2026-03-26T11:55:13.428145+00:00", "level": "INFO", "logger": "app.http", "message": "http_request", "requestId": "4b34a348a338404e83806d2372f19563", "method": "GET", "path": "/metrics", "route": "/metrics", "statusCode": 200, "durationMs": 8.25, "clientIp": "127.0.0.1"}
+{"timestamp": "2026-03-26T11:55:27.480185+00:00", "level": "WARNING", "logger": "app.ws.bus", "message": "redis_event_bus_subscribe_failed"}

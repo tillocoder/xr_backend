@@ -168,6 +168,47 @@ async def ensure_runtime_tables(connection) -> None:
     await connection.execute(
         text(
             """
+            CREATE INDEX IF NOT EXISTS ix_news_articles_visible_at_id
+            ON news_articles ((COALESCE(published_at, released_at, created_at)), id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_news_articles_liquidation_visible_at_id
+            ON news_articles (is_liquidation, (COALESCE(published_at, released_at, created_at)), id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_news_articles_category_visible_at_id
+            ON news_articles (category, (COALESCE(published_at, released_at, created_at)), id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_news_articles_source_visible_at_id
+            ON news_articles (source, (COALESCE(published_at, released_at, created_at)), id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_news_articles_unnotified_released_at_id
+            ON news_articles (released_at DESC, id DESC)
+            WHERE notified_at IS NULL AND released_at IS NOT NULL
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
             ALTER TABLE ai_provider_configs
             ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 1
             """
@@ -215,6 +256,71 @@ async def ensure_runtime_tables(connection) -> None:
             """
             CREATE INDEX IF NOT EXISTS ix_posts_author_created_at
             ON posts (author_id, created_at DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_posts_symbol_created_at_id
+            ON posts (symbol, created_at DESC, id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_posts_market_bias_created_at_id
+            ON posts (market_bias, created_at DESC, id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_posts_created_at_id
+            ON posts (created_at DESC, id DESC)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_posts_symbols_json_gin
+            ON posts
+            USING GIN (symbols_json)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_chats_last_message_id
+            ON chats (last_message_id)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_chat_members_user_unread_count
+            ON chat_members (user_id, unread_count)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_messages_reply_to_message_id
+            ON messages (reply_to_message_id)
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_messages_chat_created_at_id
+            ON messages (chat_id, created_at DESC, id DESC)
             """
         )
     )

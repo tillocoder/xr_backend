@@ -16,11 +16,44 @@ from app.services.daily_reward_service import DailyRewardService
 from app.services.membership_tiers import MEMBERSHIP_TIER_LEGEND, MEMBERSHIP_TIER_PRO
 
 
-REACTION_KEYS = ("bullish_up", "bearish_down", "laugh", "sad", "cry", "ok", "zor")
+REACTION_KEY_BY_CODE = {
+    1: "bullish_up",
+    2: "bearish_down",
+    3: "laugh",
+    4: "sad",
+    5: "cry",
+    6: "ok",
+    7: "zor",
+}
+REACTION_CODES = tuple(REACTION_KEY_BY_CODE.keys())
+REACTION_KEYS = tuple(REACTION_KEY_BY_CODE.values())
+REACTION_CODE_ALIASES = {
+    "bullish_up": 1,
+    "up": 1,
+    "bull": 1,
+    "trending_up": 1,
+    "bearish_down": 2,
+    "down": 2,
+    "bear": 2,
+    "trending_down": 2,
+    "laugh": 3,
+    "haha": 3,
+    "laughing": 3,
+    "sad": 4,
+    "cry": 5,
+    "crying": 5,
+    "ok": 6,
+    "like": 6,
+    "liked": 6,
+    "thumbs_up": 6,
+    "thumbsup": 6,
+    "zor": 7,
+    "fire": 7,
+}
 
 
-def empty_reaction_counts() -> dict[str, int]:
-    return {key: 0 for key in REACTION_KEYS}
+def empty_reaction_counts() -> dict[int, int]:
+    return {code: 0 for code in REACTION_CODES}
 
 
 def normalize_symbols(raw_values: list[object]) -> list[str]:
@@ -52,9 +85,28 @@ def normalize_market_bias(raw: object) -> str | None:
     return None
 
 
+def normalize_reaction_code(raw: object) -> int | None:
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw in REACTION_CODES else None
+    value = str(raw or "").strip().lower()
+    if not value:
+        return None
+    numeric = int(value) if value.isdigit() else None
+    if numeric in REACTION_CODES:
+        return numeric
+    return REACTION_CODE_ALIASES.get(value)
+
+
 def normalize_reaction_key(raw: object) -> str | None:
-    value = str(raw or "").strip()
-    return value if value in REACTION_KEYS else None
+    code = normalize_reaction_code(raw)
+    return REACTION_KEY_BY_CODE.get(code) if code is not None else None
+
+
+def reaction_code_to_storage(raw: object) -> str | None:
+    code = normalize_reaction_code(raw)
+    return str(code) if code is not None else None
 
 
 def normalize_display_name(raw: object) -> str:
@@ -283,7 +335,11 @@ class CommunityResponseFactory:
             blockedAccountIds=sorted(
                 {
                     item.strip()
-                    for item in list(profile.blocked_account_ids_json or []) if profile is not None
+                    for item in (
+                        list(profile.blocked_account_ids_json or [])
+                        if profile is not None
+                        else []
+                    )
                     if str(item).strip()
                 }
             ),
@@ -303,7 +359,7 @@ class CommunityResponseFactory:
         post: Post,
         user: User | None,
         profile: CommunityProfile | None,
-        reaction_counts: dict[str, int],
+        reaction_counts: dict[int, int],
     ) -> CommunityPostResponse:
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
@@ -351,7 +407,7 @@ class CommunityResponseFactory:
             poll=poll,
             commentCount=non_negative_int(post.comment_count),
             viewCount=non_negative_int(post.view_count),
-            reactionCounts=reaction_counts,
+            reactionCounts={key: value for key, value in reaction_counts.items() if value > 0},
             createdAt=post.created_at,
         )
 

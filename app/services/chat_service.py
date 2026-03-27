@@ -149,27 +149,31 @@ async def list_conversations(
     user_id: str,
     limit: int,
     public_base_url: str | None = None,
+    *,
+    chat_ids: list[str] | None = None,
 ) -> list[ChatConversationOut]:
-    last_message_subquery = (
-        select(
-            Message.chat_id.label("chat_id"),
-            func.max(Message.created_at).label("last_message_at"),
-        )
-        .group_by(Message.chat_id)
-        .subquery()
-    )
-
     stmt = (
-        select(ChatMember, Chat, last_message_subquery.c.last_message_at)
+        select(
+            ChatMember,
+            Chat,
+            Message.created_at.label("last_message_at"),
+            Message.sender_id.label("last_message_sender_id"),
+            Message.body.label("last_message_body"),
+            Message.message_type.label("last_message_type"),
+            Message.deleted_at.label("last_message_deleted_at"),
+            Message.updated_at.label("last_message_updated_at"),
+        )
         .join(Chat, Chat.id == ChatMember.chat_id)
-        .join(last_message_subquery, last_message_subquery.c.chat_id == Chat.id)
+        .outerjoin(Message, Message.id == Chat.last_message_id)
         .where(ChatMember.user_id == user_id)
-        .order_by(desc(last_message_subquery.c.last_message_at), desc(Chat.created_at))
-        .limit(limit)
+        .order_by(desc(Message.created_at).nullslast(), desc(Chat.created_at))
     )
+    if chat_ids:
+        stmt = stmt.where(Chat.id.in_(chat_ids))
+    stmt = stmt.limit(limit)
 
     rows = (await db.execute(stmt)).all()
-    chat_ids = [chat.id for _member, chat, _last_message_at in rows]
+    chat_ids = [chat.id for _member, chat, *_rest in rows]
     if not chat_ids:
         return []
 
@@ -188,56 +192,20 @@ async def list_conversations(
     for chat_id, peer in peer_rows:
         peers_by_chat_id.setdefault(chat_id, peer)
 
-    latest_message_ranked = (
-        select(
-            Message.chat_id.label("chat_id"),
-            Message.sender_id.label("sender_id"),
-            Message.body.label("body"),
-            Message.message_type.label("message_type"),
-            Message.deleted_at.label("deleted_at"),
-            Message.updated_at.label("updated_at"),
-            Message.created_at.label("created_at"),
-            func.row_number()
-            .over(
-                partition_by=Message.chat_id,
-                order_by=(Message.created_at.desc(), Message.id.desc()),
-            )
-            .label("message_rank"),
-        )
-        .where(Message.chat_id.in_(chat_ids))
-        .subquery()
-    )
-    latest_message_rows = (
-        await db.execute(
-            select(
-                latest_message_ranked.c.chat_id,
-                latest_message_ranked.c.sender_id,
-                latest_message_ranked.c.body,
-                latest_message_ranked.c.message_type,
-                latest_message_ranked.c.deleted_at,
-                latest_message_ranked.c.updated_at,
-                latest_message_ranked.c.created_at,
-            ).where(latest_message_ranked.c.message_rank == 1)
-        )
-    ).all()
-    latest_messages_by_chat_id = {
-        chat_id: {
-            "sender_id": sender_id,
-            "body": body,
-            "message_type": message_type,
-            "deleted_at": deleted_at,
-            "updated_at": updated_at,
-            "created_at": created_at,
-        }
-        for chat_id, sender_id, body, message_type, deleted_at, updated_at, created_at in latest_message_rows
-    }
-
     conversations: list[ChatConversationOut] = []
-    for member, chat, last_message_at in rows:
+    for (
+        member,
+        chat,
+        last_message_at,
+        last_message_sender_id,
+        last_message_body,
+        last_message_type,
+        last_message_deleted_at,
+        last_message_updated_at,
+    ) in rows:
         peer = peers_by_chat_id.get(chat.id)
         if peer is None:
             continue
-        last_message = latest_messages_by_chat_id.get(chat.id)
 
         conversations.append(
             ChatConversationOut(
@@ -251,23 +219,23 @@ async def list_conversations(
                 ),
                 last_message_text=(
                     _message_preview_from_fields(
-                        body=str(last_message.get("body") or ""),
-                        message_type=str(last_message.get("message_type") or "text"),
-                        deleted_at=last_message.get("deleted_at"),
+                        body=str(last_message_body or ""),
+                        message_type=str(last_message_type or "text"),
+                        deleted_at=last_message_deleted_at,
                     )
-                    if last_message is not None
+                    if last_message_at is not None
                     else ""
                 ),
                 last_message_sender_uid=(
-                    str(last_message.get("sender_id") or "") or None
-                    if last_message is not None
+                    str(last_message_sender_id or "") or None
+                    if last_message_at is not None
                     else None
                 ),
-                last_message_at=last_message_at,
+                last_message_at=last_message_at or chat.created_at,
                 unread_count=member.unread_count,
                 updated_at=(
-                    last_message.get("updated_at")
-                    if last_message is not None and last_message.get("updated_at") is not None
+                    last_message_updated_at
+                    if last_message_updated_at is not None
                     else last_message_at
                 )
                 or chat.created_at,
@@ -290,8 +258,9 @@ async def get_conversation_by_peer(
     conversations = await list_conversations(
         db=db,
         user_id=user_id,
-        limit=200,
+        limit=1,
         public_base_url=public_base_url,
+        chat_ids=[chat_id],
     )
     for conversation in conversations:
         if conversation.chat_id == chat_id:
@@ -479,7 +448,12 @@ async def send_message(
     )
 
     for recipient_id in recipients:
-        unread_total = await _compute_unread_total(db, recipient_id)
+        unread_total = await _resolve_unread_total(
+            db,
+            cache,
+            recipient_id,
+            delta=1,
+        )
         await cache.set_unread_total(recipient_id, unread_total)
         await bus.publish(
             f"user:{recipient_id}",
@@ -516,8 +490,7 @@ async def send_message(
             ) or ""
             title = sender_display_name or sender_username or "New message"
             body = preview if not sender_username else f"@{sender_username} · {preview}"
-            notification = await notification_service.create_notification(
-                db,
+            notification_service.queue_notification(
                 user_id=recipient_id,
                 kind="direct_message",
                 title=title,
@@ -532,19 +505,6 @@ async def send_message(
                     "sender_username": sender_username,
                     "sender_avatar_url": sender_avatar_url,
                 },
-            )
-            await bus.publish(
-                f"user:{recipient_id}",
-                WsEnvelope(
-                    type="notification.new",
-                    topic=f"user:{recipient_id}",
-                    data={
-                        "notification": await notification_service.serialize_notification(
-                            db,
-                            notification,
-                        )
-                    },
-                ).model_dump(mode="json"),
             )
 
     return _serialize_chat_message(
@@ -796,20 +756,30 @@ async def mark_chat_read(
     chat_id: str,
     user_id: str,
 ) -> None:
+    member = await db.scalar(
+        select(ChatMember).where(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == user_id,
+        )
+    )
+    if member is None:
+        return
+    previous_unread_count = max(0, int(member.unread_count or 0))
     latest_message_id = await db.scalar(
-        select(Message.id)
-        .where(Message.chat_id == chat_id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
+        select(Chat.last_message_id)
+        .where(Chat.id == chat_id)
         .limit(1)
     )
-    await db.execute(
-        update(ChatMember)
-        .where(ChatMember.chat_id == chat_id, ChatMember.user_id == user_id)
-        .values(last_read_message_id=latest_message_id, unread_count=0)
-    )
+    member.last_read_message_id = latest_message_id
+    member.unread_count = 0
     await db.commit()
 
-    unread_total = await _compute_unread_total(db, user_id)
+    unread_total = await _resolve_unread_total(
+        db,
+        cache,
+        user_id,
+        delta=-previous_unread_count,
+    )
     await cache.set_unread_total(user_id, unread_total)
     await bus.publish(
         f"user:{user_id}",
@@ -854,19 +824,29 @@ async def mark_all_chats_read(
         await cache.set_unread_total(user_id, 0)
         return
 
-    for member in members:
-        latest_message_id = await db.scalar(
-            select(Message.id)
-            .where(Message.chat_id == member.chat_id)
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .limit(1)
+    removed_unread_total = sum(max(0, int(member.unread_count or 0)) for member in members)
+    chat_ids = [member.chat_id for member in members]
+    last_message_rows = (
+        await db.execute(
+            select(Chat.id, Chat.last_message_id).where(Chat.id.in_(chat_ids))
         )
-        member.last_read_message_id = latest_message_id
+    ).all()
+    last_message_by_chat_id = {
+        str(chat_id): (str(last_message_id) if last_message_id is not None else None)
+        for chat_id, last_message_id in last_message_rows
+    }
+    for member in members:
+        member.last_read_message_id = last_message_by_chat_id.get(member.chat_id)
         member.unread_count = 0
 
     await db.commit()
 
-    unread_total = await _compute_unread_total(db, user_id)
+    unread_total = await _resolve_unread_total(
+        db,
+        cache,
+        user_id,
+        delta=-removed_unread_total,
+    )
     await cache.set_unread_total(user_id, unread_total)
     for member in members:
         await bus.publish(
@@ -890,6 +870,20 @@ async def get_unread_total(
     unread_total = await _compute_unread_total(db, user_id)
     await cache.set_unread_total(user_id, unread_total)
     return unread_total
+
+
+async def _resolve_unread_total(
+    db: AsyncSession,
+    cache: RedisCache,
+    user_id: str,
+    *,
+    delta: int | None = None,
+) -> int:
+    if delta is not None:
+        cached = await cache.get_unread_total(user_id)
+        if cached is not None:
+            return max(0, int(cached) + int(delta))
+    return await _compute_unread_total(db, user_id)
 
 
 async def _compute_unread_total(db: AsyncSession, user_id: str) -> int:

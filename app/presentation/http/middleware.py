@@ -143,10 +143,12 @@ class RateLimitMiddleware:
         headers = Headers(scope=scope)
         ip_key = _client_ip_from_scope(scope)
         user_key = _user_key_from_headers(headers)
+        bucket = _rate_limit_bucket(scope)
+        ip_limit, user_limit = _rate_limit_limits(self._settings, bucket)
 
         ip_decision = await limiter.check(
-            key=f"ratelimit:ip:{ip_key}",
-            limit=self._settings.rate_limit_max_requests_per_ip,
+            key=f"ratelimit:ip:{bucket}:{ip_key}",
+            limit=ip_limit,
         )
         if not ip_decision.allowed:
             response = JSONResponse(
@@ -157,10 +159,10 @@ class RateLimitMiddleware:
             await response(scope, receive, send)
             return
 
-        if user_key:
+        if user_key and user_limit > 0:
             user_decision = await limiter.check(
-                key=f"ratelimit:user:{user_key}",
-                limit=self._settings.rate_limit_max_requests_per_user,
+                key=f"ratelimit:user:{bucket}:{user_key}",
+                limit=user_limit,
             )
             if not user_decision.allowed:
                 response = JSONResponse(
@@ -206,3 +208,31 @@ def _request_is_https(scope: Scope) -> bool:
     if '"scheme":"https"' in cf_visitor:
         return True
     return str(scope.get("scheme", "")).lower() == "https"
+
+
+def _rate_limit_bucket(scope: Scope) -> str:
+    method = str(scope.get("method", "GET")).upper()
+    path = str(scope.get("path") or "")
+    if method in {"GET", "HEAD"} and (
+        path.startswith("/api/v1/news")
+        or path.startswith("/api/v1/home/overview")
+        or path.startswith("/api/v1/community/posts")
+        or path.startswith("/api/v1/community/feed")
+        or path.startswith("/api/v1/community/profiles/recent")
+        or path.startswith("/api/v1/learning/videos")
+        or path.startswith("/api/v1/me/bootstrap")
+    ):
+        return "read"
+    return "default"
+
+
+def _rate_limit_limits(settings: Settings, bucket: str) -> tuple[int, int]:
+    if bucket == "read":
+        return (
+            max(1, int(settings.rate_limit_read_max_requests_per_ip)),
+            max(1, int(settings.rate_limit_read_max_requests_per_user)),
+        )
+    return (
+        max(1, int(settings.rate_limit_max_requests_per_ip)),
+        max(1, int(settings.rate_limit_max_requests_per_user)),
+    )

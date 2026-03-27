@@ -34,6 +34,7 @@ def _probe_host(host: str) -> str:
 if __name__ == "__main__":
     host = os.getenv("XR_BACKEND_HOST", "0.0.0.0")
     port = int(os.getenv("XR_BACKEND_PORT", "8000"))
+    os.environ["XR_PROCESS_WORKER_COUNT"] = "1"
     if _port_in_use(host, port):
         if _backend_already_running(host, port):
             print(f"XR backend is already running at http://{_probe_host(host)}:{port}")

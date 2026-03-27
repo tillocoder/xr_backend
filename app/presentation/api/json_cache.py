@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Request
@@ -60,6 +61,38 @@ class JsonRouteCache:
             if key.startswith(prefix):
                 self._process_cache.pop(key, None)
 
+    def _process_patch_exact(
+        self,
+        request: Request,
+        key: str,
+        patcher: Callable[[dict | list], dict | list | None],
+    ) -> bool:
+        payload = self._process_get(key)
+        if payload is None or not isinstance(payload, (dict, list)):
+            return False
+        try:
+            patched = patcher(payload)
+        except Exception:
+            return False
+        if patched is None or patched == payload or not isinstance(patched, (dict, list)):
+            return False
+        self._process_set(request, key, patched)
+        return True
+
+    def _process_patch_prefix(
+        self,
+        request: Request,
+        prefix: str,
+        patcher: Callable[[dict | list], dict | list | None],
+    ) -> int:
+        updated = 0
+        for key in list(self._process_cache.keys()):
+            if not key.startswith(prefix):
+                continue
+            if self._process_patch_exact(request, key, patcher):
+                updated += 1
+        return updated
+
     def normalize_payload(self, value: Any) -> Any:
         if hasattr(value, "model_dump"):
             return value.model_dump(mode="json")
@@ -105,3 +138,35 @@ class JsonRouteCache:
         cache = get_optional_cache(request)
         if cache is not None:
             await cache.delete_json_prefix(prefix)
+
+    async def patch_exact(
+        self,
+        request: Request,
+        key: str,
+        patcher: Callable[[dict | list], dict | list | None],
+    ) -> bool:
+        updated = self._process_patch_exact(request, key, patcher)
+        cache = get_optional_cache(request)
+        if cache is None:
+            return updated
+        return await cache.patch_json(
+            key,
+            patcher,
+            ttl_seconds=self.ttl_seconds(request),
+        ) or updated
+
+    async def patch_prefix(
+        self,
+        request: Request,
+        prefix: str,
+        patcher: Callable[[dict | list], dict | list | None],
+    ) -> int:
+        updated = self._process_patch_prefix(request, prefix, patcher)
+        cache = get_optional_cache(request)
+        if cache is None:
+            return updated
+        return updated + await cache.patch_json_prefix(
+            prefix,
+            patcher,
+            ttl_seconds=self.ttl_seconds(request),
+        )

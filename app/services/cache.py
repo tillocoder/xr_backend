@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 
 import redis.asyncio as redis
 from redis.exceptions import RedisError
@@ -17,7 +18,12 @@ class RedisCache:
         self._int_fallback_cache: dict[str, tuple[float, int]] = {}
         self._counter_fallback_cache: dict[str, tuple[float, int]] = {}
         self._redis_disabled_until = 0.0
-        self._redis_retry_after_seconds = 15.0
+        self._redis_retry_after_seconds = max(1.0, float(settings.redis_retry_after_seconds))
+        self._redis_retry_after_max_seconds = max(
+            self._redis_retry_after_seconds,
+            float(settings.redis_retry_after_max_seconds),
+        )
+        self._redis_current_retry_after_seconds = self._redis_retry_after_seconds
         self._client = redis.from_url(
             url or settings.redis_url,
             decode_responses=True,
@@ -34,7 +40,15 @@ class RedisCache:
         return time.monotonic() >= self._redis_disabled_until
 
     def _mark_redis_unavailable(self) -> None:
-        self._redis_disabled_until = time.monotonic() + self._redis_retry_after_seconds
+        self._redis_disabled_until = time.monotonic() + self._redis_current_retry_after_seconds
+        self._redis_current_retry_after_seconds = min(
+            self._redis_retry_after_max_seconds,
+            self._redis_current_retry_after_seconds * 2,
+        )
+
+    def _mark_redis_available(self) -> None:
+        self._redis_disabled_until = 0.0
+        self._redis_current_retry_after_seconds = self._redis_retry_after_seconds
 
     def _set_local_json(self, key: str, payload: dict | list, ttl_seconds: int) -> None:
         expires_at = time.monotonic() + max(1, int(ttl_seconds))
@@ -122,6 +136,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return self._get_local_json(key)
+        self._mark_redis_available()
         if raw is None:
             return self._get_local_json(key)
         try:
@@ -147,6 +162,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return
+        self._mark_redis_available()
 
     async def delete_json(self, key: str) -> None:
         self._json_fallback_cache.pop(key, None)
@@ -156,6 +172,8 @@ class RedisCache:
             await self._client.delete(key)
         except RedisError:
             self._mark_redis_unavailable()
+            return
+        self._mark_redis_available()
 
     async def delete_json_prefix(self, prefix: str) -> None:
         normalized_prefix = prefix.strip()
@@ -180,6 +198,127 @@ class RedisCache:
                 await self._client.delete(*batch)
         except RedisError:
             self._mark_redis_unavailable()
+            return
+        self._mark_redis_available()
+
+    def _apply_json_patch(
+        self,
+        payload: dict | list,
+        patcher: Callable[[dict | list], dict | list | None],
+    ) -> dict | list | None:
+        try:
+            patched = patcher(payload)
+        except Exception:
+            return None
+        if patched is None or patched == payload:
+            return None
+        if not isinstance(patched, (dict, list)):
+            return None
+        return patched
+
+    def _patch_local_json_exact(
+        self,
+        key: str,
+        patcher: Callable[[dict | list], dict | list | None],
+        ttl_seconds: int,
+    ) -> bool:
+        payload = self._get_local_json(key)
+        if payload is None:
+            return False
+        patched = self._apply_json_patch(payload, patcher)
+        if patched is None:
+            return False
+        self._set_local_json(key, patched, ttl_seconds)
+        return True
+
+    def _patch_local_json_prefix(
+        self,
+        prefix: str,
+        patcher: Callable[[dict | list], dict | list | None],
+        ttl_seconds: int,
+    ) -> int:
+        updated = 0
+        for key in list(self._json_fallback_cache.keys()):
+            if not key.startswith(prefix):
+                continue
+            if self._patch_local_json_exact(key, patcher, ttl_seconds):
+                updated += 1
+        return updated
+
+    async def patch_json(
+        self,
+        key: str,
+        patcher: Callable[[dict | list], dict | list | None],
+        ttl_seconds: int = 120,
+    ) -> bool:
+        updated = self._patch_local_json_exact(key, patcher, ttl_seconds)
+        if not self._redis_available():
+            return updated
+        try:
+            raw = await self._client.get(key)
+            if raw is None:
+                self._mark_redis_available()
+                return updated
+            payload = json.loads(raw)
+            if not isinstance(payload, (dict, list)):
+                self._mark_redis_available()
+                return updated
+            patched = self._apply_json_patch(payload, patcher)
+            if patched is None:
+                self._mark_redis_available()
+                return updated
+            await self._client.set(
+                key,
+                json.dumps(patched, separators=(",", ":")),
+                ex=ttl_seconds,
+            )
+        except RedisError:
+            self._mark_redis_unavailable()
+            return updated
+        except Exception:
+            return updated
+        self._mark_redis_available()
+        return True
+
+    async def patch_json_prefix(
+        self,
+        prefix: str,
+        patcher: Callable[[dict | list], dict | list | None],
+        ttl_seconds: int = 120,
+    ) -> int:
+        normalized_prefix = prefix.strip()
+        if not normalized_prefix:
+            return 0
+        updated = self._patch_local_json_prefix(normalized_prefix, patcher, ttl_seconds)
+        if not self._redis_available():
+            return updated
+        try:
+            async for key in self._client.scan_iter(
+                match=f"{normalized_prefix}*",
+                count=100,
+            ):
+                raw = await self._client.get(key)
+                if raw is None:
+                    continue
+                payload = json.loads(raw)
+                if not isinstance(payload, (dict, list)):
+                    continue
+                patched = self._apply_json_patch(payload, patcher)
+                if patched is None:
+                    continue
+                await self._client.set(
+                    key,
+                    json.dumps(patched, separators=(",", ":")),
+                    ex=ttl_seconds,
+                )
+                updated += 1
+        except RedisError:
+            self._mark_redis_unavailable()
+            return updated
+        except Exception:
+            return updated
+        self._mark_redis_available()
+        return updated
 
     async def get_profile(self, user_id: str) -> dict | None:
         payload = await self.get_json(f"profile:{user_id}")
@@ -197,6 +336,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return self._get_local_hash(key)
+        self._mark_redis_available()
         if not raw:
             return self._get_local_hash(key)
         counts = {field: int(value) for field, value in raw.items()}
@@ -230,6 +370,7 @@ class RedisCache:
                 for post_id in normalized_ids
                 if (counts := self._get_local_hash(f"post:{post_id}:reaction_counts")) is not None
             }
+        self._mark_redis_available()
         out: dict[str, dict[str, int]] = {}
         for post_id, raw in zip(normalized_ids, rows):
             key = f"post:{post_id}:reaction_counts"
@@ -262,6 +403,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return
+        self._mark_redis_available()
 
     async def bump_post_reaction_count(
         self,
@@ -280,6 +422,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return
+        self._mark_redis_available()
 
     async def get_unread_total(self, user_id: str) -> int | None:
         key = f"user:{user_id}:unread_total"
@@ -290,6 +433,7 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return self._get_local_int(key)
+        self._mark_redis_available()
         if raw is None:
             return self._get_local_int(key)
         value = int(raw)
@@ -306,15 +450,18 @@ class RedisCache:
         except RedisError:
             self._mark_redis_unavailable()
             return
+        self._mark_redis_available()
 
     async def ping(self) -> bool:
         if not self._redis_available():
             return False
         try:
-            return bool(await self._client.ping())
+            result = bool(await self._client.ping())
         except RedisError:
             self._mark_redis_unavailable()
             return False
+        self._mark_redis_available()
+        return result
 
     async def increment(self, key: str, *, ttl_seconds: int) -> tuple[int, int]:
         if not self._redis_available():

@@ -52,11 +52,20 @@ class DailyRewardService:
     paid_pro_posts_per_day = 20
 
     async def get_status(self, db: AsyncSession, *, user_id: str) -> DailyRewardStatus:
+        _user, status = await self.get_status_with_user(db, user_id=user_id)
+        return status
+
+    async def get_status_with_user(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: str,
+    ) -> tuple[User, DailyRewardStatus]:
         user, created = await self._ensure_user(db, user_id)
         changed = await self._maybe_activate_reward_pro(db, user)
         if created or changed:
             await db.commit()
-        return self._status_from_user(user)
+        return user, self._status_from_user(user)
 
     async def claim(self, db: AsyncSession, *, user_id: str) -> DailyRewardStatus:
         user, _ = await self._ensure_user(db, user_id)

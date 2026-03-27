@@ -1,3 +1,6 @@
+import asyncio
+import contextlib
+
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from starlette.datastructures import Headers
 
@@ -14,17 +17,44 @@ from app.services.chat_service import (
     update_message_for_user,
 )
 from app.services.community_service import CommunityService
-from app.services.cache import RedisCache
 from app.schemas.ws import WsEnvelope
-from app.ws.bus import RedisEventBus
 
 from app.api.deps import CurrentUser, get_ws_user
 
 router = APIRouter(tags=["ws"])
+_ALLOWED_CLIENT_TOPIC_PREFIXES = ("feed:", "presence:")
 
 
 def _public_base_url(ws: WebSocket) -> str:
     return get_public_base_url_for_websocket(ws)
+
+
+def _connection_id(ws: WebSocket) -> str:
+    state = ws.scope.setdefault("state", {})
+    return str(state.get("connection_id") or "")
+
+
+async def _send_ws_payload(ws: WebSocket, payload: dict) -> None:
+    connection_id = _connection_id(ws)
+    if not connection_id:
+        return
+    await ws.app.state.ws_manager.send_to_connection(connection_id, payload)
+
+
+async def _publish_presence_state(
+    ws: WebSocket,
+    *,
+    user_id: str,
+    is_online: bool,
+    ) -> None:
+    await ws.app.state.bus.publish(
+        f"presence:{user_id}",
+        WsEnvelope(
+            type="chat.presence",
+            topic=f"presence:{user_id}",
+            data={"user_id": user_id, "is_online": is_online},
+        ).model_dump(mode="json"),
+    )
 
 
 @router.websocket("/ws")
@@ -34,17 +64,17 @@ async def websocket_endpoint(
 ):
     manager = ws.app.state.ws_manager
     settings = ws.app.state.settings
+    presence_service = ws.app.state.presence_service
     if not await _allow_ws_connect(ws, user.id):
         return
-    await manager.connect_user(user.id, ws)
-    await ws.app.state.bus.publish(
-        f"presence:{user.id}",
-        WsEnvelope(
-            type="chat.presence",
-            topic=f"presence:{user.id}",
-            data={"user_id": user.id, "is_online": True},
-        ).model_dump(mode="json"),
+    connection = await manager.connect_user(user.id, ws)
+    ws.scope.setdefault("state", {})["connection_id"] = connection.connection_id
+    became_online = await presence_service.connect(
+        user_id=user.id,
+        connection_id=connection.connection_id,
     )
+    if became_online:
+        await _publish_presence_state(ws, user_id=user.id, is_online=True)
 
     try:
         while True:
@@ -56,28 +86,72 @@ async def websocket_endpoint(
             if action == "subscribe_chat":
                 chat_id = str(message.get("chat_id", "")).strip()
                 if chat_id:
-                    manager.join_room(chat_id, ws)
-                    await ws.send_json({"type": "subscribed", "topic": f"room:{chat_id}"})
+                    join_status = manager.join_room(chat_id, connection.connection_id)
+                    if join_status == "limit_reached":
+                        await _send_ws_payload(
+                            ws,
+                            {
+                                "type": "error",
+                                "topic": "system",
+                                "data": {
+                                    "message": "Too many active chat subscriptions on this connection.",
+                                },
+                            },
+                        )
+                        continue
+                    await _send_ws_payload(
+                        ws,
+                        {"type": "subscribed", "topic": f"room:{chat_id}"},
+                    )
 
             elif action == "unsubscribe_chat":
                 chat_id = str(message.get("chat_id", "")).strip()
                 if chat_id:
-                    manager.leave_room(chat_id, ws)
+                    manager.leave_room(chat_id, connection.connection_id)
 
             elif action == "subscribe_topic":
                 topic = str(message.get("topic", "")).strip()
                 if topic:
-                    manager.subscribe_topic(topic, ws)
-                    await ws.send_json({"type": "subscribed", "topic": topic})
-                    await _send_topic_snapshot(ws, topic)
+                    if not _is_allowed_client_topic(topic):
+                        await _send_ws_payload(
+                            ws,
+                            {
+                                "type": "error",
+                                "topic": "system",
+                                "data": {"message": "Unsupported websocket topic."},
+                            },
+                        )
+                        continue
+                    subscribe_status = manager.subscribe_topic(
+                        topic,
+                        connection.connection_id,
+                    )
+                    if subscribe_status == "limit_reached":
+                        await _send_ws_payload(
+                            ws,
+                            {
+                                "type": "error",
+                                "topic": "system",
+                                "data": {
+                                    "message": "Too many active topic subscriptions on this connection.",
+                                },
+                            },
+                        )
+                        continue
+                    await _send_ws_payload(ws, {"type": "subscribed", "topic": topic})
+                    if subscribe_status == "subscribed":
+                        await _send_topic_snapshot(ws, topic)
 
             elif action == "unsubscribe_topic":
                 topic = str(message.get("topic", "")).strip()
                 if topic:
-                    manager.unsubscribe_topic(topic, ws)
+                    manager.unsubscribe_topic(topic, connection.connection_id)
 
             elif action == "ping":
-                await ws.send_json({"type": "pong", "heartbeat": settings.ws_heartbeat_seconds})
+                await _send_ws_payload(
+                    ws,
+                    {"type": "pong", "heartbeat": settings.ws_heartbeat_seconds},
+                )
             elif action == "chat.send":
                 await _handle_chat_send(ws, user, message)
             elif action == "chat.send_voice":
@@ -92,19 +166,16 @@ async def websocket_endpoint(
                 await _handle_chat_read(ws, user, message)
             elif action == "chat.typing":
                 await _handle_chat_typing(ws, user, message)
-    except WebSocketDisconnect:
-        manager.disconnect_user(user.id, ws)
-        await ws.app.state.bus.publish(
-            f"presence:{user.id}",
-            WsEnvelope(
-                type="chat.presence",
-                topic=f"presence:{user.id}",
-                data={
-                    "user_id": user.id,
-                    "is_online": manager.is_user_online(user.id),
-                },
-            ).model_dump(mode="json"),
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        await manager.disconnect_connection(connection.connection_id)
+        became_offline = await presence_service.disconnect(
+            user_id=user.id,
+            connection_id=connection.connection_id,
         )
+        if became_offline:
+            await _publish_presence_state(ws, user_id=user.id, is_online=False)
 
 
 async def _handle_chat_send(ws: WebSocket, user: CurrentUser, message: dict) -> None:
@@ -154,7 +225,8 @@ async def _handle_chat_send(ws: WebSocket, user: CurrentUser, message: dict) -> 
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -222,7 +294,8 @@ async def _handle_chat_send_voice(ws: WebSocket, user: CurrentUser, message: dic
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -252,7 +325,8 @@ async def _handle_chat_read(ws: WebSocket, user: CurrentUser, message: dict) -> 
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -305,7 +379,8 @@ async def _handle_chat_edit(ws: WebSocket, user: CurrentUser, message: dict) -> 
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -337,7 +412,8 @@ async def _handle_chat_delete(ws: WebSocket, user: CurrentUser, message: dict) -
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -371,7 +447,8 @@ async def _handle_chat_delete_conversation(
             await _send_command_error(ws, request_id, str(error))
             return
 
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "ack",
             "request_id": request_id,
@@ -414,7 +491,8 @@ async def _allow_ws_message(ws: WebSocket, user_id: str) -> bool:
         limit=settings.websocket_rate_limit_max_messages_per_ip,
     )
     if not ip_decision.allowed:
-        await ws.send_json(
+        await _send_ws_payload(
+            ws,
             {
                 "type": "error",
                 "topic": "system",
@@ -432,7 +510,8 @@ async def _allow_ws_message(ws: WebSocket, user_id: str) -> bool:
         limit=settings.websocket_rate_limit_max_messages_per_user,
     )
     if not user_decision.allowed:
-        await ws.send_json(
+        await _send_ws_payload(
+            ws,
             {
                 "type": "error",
                 "topic": "system",
@@ -453,21 +532,23 @@ async def _send_topic_snapshot(ws: WebSocket, topic: str) -> None:
     peer_id = topic.split(":", 1)[1].strip()
     if not peer_id:
         return
-    manager = ws.app.state.ws_manager
-    await ws.send_json(
+    is_online = await ws.app.state.presence_service.is_online(peer_id)
+    await _send_ws_payload(
+        ws,
         WsEnvelope(
             type="chat.presence",
             topic=topic,
             data={
                 "user_id": peer_id,
-                "is_online": manager.is_user_online(peer_id),
+                "is_online": is_online,
             },
         ).model_dump(mode="json")
     )
 
 
 async def _send_command_error(ws: WebSocket, request_id: str, message: str) -> None:
-    await ws.send_json(
+    await _send_ws_payload(
+        ws,
         {
             "type": "error",
             "request_id": request_id,
@@ -486,3 +567,10 @@ def _ws_client_ip(ws: WebSocket) -> str:
     if client is not None:
         return str(client.host)
     return "unknown"
+
+
+def _is_allowed_client_topic(topic: str) -> bool:
+    normalized = str(topic or "").strip()
+    if not normalized or len(normalized) > 160:
+        return False
+    return any(normalized.startswith(prefix) for prefix in _ALLOWED_CLIENT_TOPIC_PREFIXES)

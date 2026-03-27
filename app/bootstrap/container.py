@@ -11,7 +11,10 @@ from app.services.firebase_push_service import FirebasePushService
 from app.services.market_runtime_service import MarketRuntimeService
 from app.services.news_runtime_service import NewsRuntimeService
 from app.services.notification_service import NotificationService
+from app.services.presence_service import PresenceService
+from app.services.presence_runtime_service import PresenceRuntimeService
 from app.services.push_token_service import PushTokenService
+from app.services.runtime_lease_service import RuntimeLeaseService
 from app.ws.bus import RedisEventBus
 from app.ws.manager import ConnectionManager
 
@@ -28,6 +31,9 @@ class AppContainer:
     news_runtime_service: NewsRuntimeService
     market_runtime_service: MarketRuntimeService
     notification_service: NotificationService
+    presence_service: PresenceService
+    presence_runtime_service: PresenceRuntimeService
+    runtime_lease_service: RuntimeLeaseService
     system_status_service: SystemStatusService
     rate_limiter: RedisRateLimiter | None = None
 
@@ -43,3 +49,6 @@ class AppContainer:
         app.state.news_runtime_service = self.news_runtime_service
         app.state.market_runtime_service = self.market_runtime_service
         app.state.notification_service = self.notification_service
+        app.state.presence_service = self.presence_service
+        app.state.presence_runtime_service = self.presence_runtime_service
+        app.state.runtime_lease_service = self.runtime_lease_service

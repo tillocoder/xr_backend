@@ -10,18 +10,13 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.admin_panel import setup_admin_panel
-from app.api.admin import router as admin_router
-from app.api.compat import router as compat_router
-from app.api.community import router as community_router
-from app.api.learning import admin_router as learning_admin_router
-from app.api.learning import router as learning_router
-from app.api.me import router as me_router
-from app.api.signals import router as signals_router
-from app.api.ws import router as ws_router
 from app.bootstrap.lifespan import lifespan
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.presentation.api.system import router as system_router
+from app.presentation.api.admin import learning_admin_router
+from app.presentation.api.admin import router as admin_router
+from app.presentation.api.v1 import router as api_v1_router
+from app.modules.system.presentation import router as system_router
 from app.presentation.http.middleware import (
     ObservabilityMiddleware,
     RateLimitMiddleware,
@@ -65,12 +60,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(system_router)
-    app.include_router(compat_router, prefix=settings.api_prefix)
-    app.include_router(community_router, prefix=settings.api_prefix)
-    app.include_router(learning_router, prefix=settings.api_prefix)
-    app.include_router(me_router, prefix=settings.api_prefix)
-    app.include_router(signals_router, prefix=settings.api_prefix)
-    app.include_router(ws_router, prefix=settings.api_prefix)
+    app.include_router(api_v1_router, prefix=settings.api_prefix)
     if settings.admin_features_enabled:
         setup_admin_panel(app)
         app.include_router(admin_router, prefix=settings.api_prefix)

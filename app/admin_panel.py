@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import secrets
 
+import anyio
 from fastapi import FastAPI
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, delete, func, select, update
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -97,7 +98,24 @@ class CommunityProfileAdmin(ModelView, model=CommunityProfile):
     form_excluded_columns = [CommunityProfile.created_at, CommunityProfile.updated_at]
 
 
-class PostAdmin(ModelView, model=Post):
+class _SafeDeleteModelView(ModelView):
+    async def delete_model(self, request: Request, pk: str) -> None:
+        await anyio.to_thread.run_sync(self._delete_model_sync, pk)
+
+    def _delete_model_sync(self, pk: str) -> None:
+        with self.session_maker(expire_on_commit=False) as session:
+            obj = session.execute(self._stmt_by_identifier(pk)).scalars().first()
+            if obj is None:
+                return
+            self._delete_dependencies_sync(session, obj)
+            session.delete(obj)
+            session.commit()
+
+    def _delete_dependencies_sync(self, session, obj) -> None:
+        return None
+
+
+class PostAdmin(_SafeDeleteModelView, model=Post):
     column_list = [
         Post.id,
         Post.author_id,
@@ -110,8 +128,29 @@ class PostAdmin(ModelView, model=Post):
     column_searchable_list = [Post.id, Post.author_id, Post.content]
     column_default_sort = (Post.created_at, True)
 
+    def _delete_dependencies_sync(self, session, obj: Post) -> None:
+        post_id = obj.id
+        comment_ids = list(
+            session.execute(
+                select(Comment.id).where(Comment.post_id == post_id)
+            ).scalars().all()
+        )
+        if comment_ids:
+            session.execute(
+                update(Comment)
+                .where(Comment.reply_to_comment_id.in_(comment_ids))
+                .values(reply_to_comment_id=None)
+            )
+            session.execute(
+                delete(CommentReaction).where(CommentReaction.comment_id.in_(comment_ids))
+            )
+            session.execute(delete(Comment).where(Comment.id.in_(comment_ids)))
+        session.execute(delete(PollVote).where(PollVote.post_id == post_id))
+        session.execute(delete(PostView).where(PostView.post_id == post_id))
+        session.execute(delete(PostReaction).where(PostReaction.post_id == post_id))
 
-class CommentAdmin(ModelView, model=Comment):
+
+class CommentAdmin(_SafeDeleteModelView, model=Comment):
     column_list = [
         Comment.id,
         Comment.post_id,
@@ -122,8 +161,21 @@ class CommentAdmin(ModelView, model=Comment):
     column_searchable_list = [Comment.id, Comment.post_id, Comment.author_id, Comment.content]
     column_default_sort = (Comment.created_at, True)
 
+    def _delete_dependencies_sync(self, session, obj: Comment) -> None:
+        session.execute(
+            update(Comment)
+            .where(Comment.reply_to_comment_id == obj.id)
+            .values(reply_to_comment_id=None)
+        )
+        session.execute(delete(CommentReaction).where(CommentReaction.comment_id == obj.id))
+        session.execute(
+            update(Post)
+            .where(Post.id == obj.post_id, Post.comment_count > 0)
+            .values(comment_count=Post.comment_count - 1)
+        )
 
-class MessageAdmin(ModelView, model=Message):
+
+class MessageAdmin(_SafeDeleteModelView, model=Message):
     column_list = [
         Message.id,
         Message.chat_id,
@@ -136,11 +188,42 @@ class MessageAdmin(ModelView, model=Message):
     column_searchable_list = [Message.id, Message.chat_id, Message.sender_id, Message.body]
     column_default_sort = (Message.created_at, True)
 
+    def _delete_dependencies_sync(self, session, obj: Message) -> None:
+        session.execute(
+            update(Message)
+            .where(Message.reply_to_message_id == obj.id)
+            .values(reply_to_message_id=None)
+        )
+        session.execute(
+            update(Chat)
+            .where(Chat.last_message_id == obj.id)
+            .values(last_message_id=None)
+        )
+        session.execute(
+            update(ChatMember)
+            .where(ChatMember.last_read_message_id == obj.id)
+            .values(last_read_message_id=None)
+        )
 
-class ChatAdmin(ModelView, model=Chat):
+
+class ChatAdmin(_SafeDeleteModelView, model=Chat):
     column_list = [Chat.id, Chat.chat_type, Chat.last_message_id, Chat.created_at]
     column_searchable_list = [Chat.id, Chat.chat_type]
     column_default_sort = (Chat.created_at, True)
+
+    def _delete_dependencies_sync(self, session, obj: Chat) -> None:
+        session.execute(
+            update(ChatMember)
+            .where(ChatMember.chat_id == obj.id)
+            .values(last_read_message_id=None, unread_count=0)
+        )
+        session.execute(
+            update(Message)
+            .where(Message.chat_id == obj.id)
+            .values(reply_to_message_id=None)
+        )
+        session.execute(delete(ChatMember).where(ChatMember.chat_id == obj.id))
+        session.execute(delete(Message).where(Message.chat_id == obj.id))
 
 
 class ChatMemberAdmin(ModelView, model=ChatMember):

@@ -184,6 +184,72 @@ class NotificationService:
         )
         return notification
 
+    def queue_notification(
+        self,
+        *,
+        user_id: str,
+        kind: str,
+        title: str,
+        body: str,
+        actor_uid: str | None = None,
+        post_id: str | None = None,
+        extra_payload: dict[str, object] | None = None,
+        publish_ws: bool = True,
+    ) -> None:
+        asyncio.create_task(
+            self._create_notification_with_session(
+                user_id=user_id,
+                kind=kind,
+                title=title,
+                body=body,
+                actor_uid=actor_uid,
+                post_id=post_id,
+                extra_payload=dict(extra_payload or {}),
+                publish_ws=publish_ws,
+            )
+        )
+
+    async def _create_notification_with_session(
+        self,
+        *,
+        user_id: str,
+        kind: str,
+        title: str,
+        body: str,
+        actor_uid: str | None,
+        post_id: str | None,
+        extra_payload: dict[str, object],
+        publish_ws: bool,
+    ) -> None:
+        try:
+            async with SessionLocal() as db:
+                notification = await self.create_notification(
+                    db,
+                    user_id=user_id,
+                    kind=kind,
+                    title=title,
+                    body=body,
+                    actor_uid=actor_uid,
+                    post_id=post_id,
+                    extra_payload=extra_payload,
+                )
+                if publish_ws and self._bus is not None:
+                    await self._bus.publish(
+                        f"user:{user_id}",
+                        WsEnvelope(
+                            type="notification.new",
+                            topic=f"user:{user_id}",
+                            data={
+                                "notification": await self.serialize_notification(
+                                    db,
+                                    notification,
+                                )
+                            },
+                        ).model_dump(mode="json"),
+                    )
+        except Exception:
+            return
+
     async def create_broadcast_notification(
         self,
         db: AsyncSession,

@@ -16,7 +16,13 @@ from app.core.config import Settings
 from app.db.session import SessionLocal
 from app.models.entities import MarketAlertEvent, MarketCoin, MarketPricePoint, User, UserTargetAlert
 from app.services.cache import RedisCache
+from app.services.db_runtime_lock_service import (
+    release_session_advisory_lock,
+    try_acquire_session_advisory_lock,
+)
 from app.services.notification_service import NotificationService
+from app.services.periodic_runtime_service import PeriodicRuntimeService
+from app.services.runtime_lease_service import RuntimeLeaseService
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +32,7 @@ _SNAPSHOT_CACHE_GRACE_SECONDS = 240
 _PRO_SIGNAL_DEDUPE_HOURS = 8
 _MARKET_ALERT_DEDUPE_HOURS = 6
 _TARGET_TRIGGER_COOLDOWN_HOURS = 24
+_MARKET_RUNTIME_DB_LOCK_KEY = 60241612
 
 
 def _utc_now() -> datetime:
@@ -95,55 +102,66 @@ def _bounded_float(
     return normalized
 
 
-class MarketRuntimeService:
+class MarketRuntimeService(PeriodicRuntimeService):
     def __init__(
         self,
         *,
         settings: Settings,
         cache: RedisCache,
         notification_service: NotificationService,
+        lease_service: RuntimeLeaseService,
         poll_interval_seconds: int | None = None,
         tracked_limit: int | None = None,
     ) -> None:
+        super().__init__()
         self._settings = settings
         self._cache = cache
         self._notification_service = notification_service
+        self._lease_service = lease_service
         self._poll_interval_seconds = max(
             30, int(poll_interval_seconds or settings.market_poll_interval_seconds)
         )
         self._tracked_limit = max(5, int(tracked_limit or settings.market_tracked_limit))
-        self._task: asyncio.Task | None = None
-        self._started = False
-
-    async def start(self) -> None:
-        if self._started:
-            return
-        self._started = True
-        self._task = asyncio.create_task(self._run_loop())
+        self._manual_refresh_task: asyncio.Task | None = None
+        self._manual_refresh_lock = asyncio.Lock()
 
     async def stop(self) -> None:
-        task = self._task
-        self._task = None
-        if task is not None:
-            task.cancel()
+        await super().stop()
+        manual_refresh_task = self._manual_refresh_task
+        self._manual_refresh_task = None
+        if manual_refresh_task is not None:
+            manual_refresh_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await task
+                await manual_refresh_task
 
-    async def _run_loop(self) -> None:
-        try:
-            while True:
-                await self.refresh_once()
-                await asyncio.sleep(self._poll_interval_seconds)
-        except asyncio.CancelledError:
-            raise
+    @property
+    def poll_interval_seconds(self) -> int:
+        return self._poll_interval_seconds
 
-    async def refresh_once(self) -> None:
+    async def run_cycle(self) -> None:
+        lease = await self._lease_service.acquire(
+            "runtime:market:cycle",
+            ttl_seconds=max(self._poll_interval_seconds * 3, 120),
+        )
+        if lease is None:
+            return
         async with SessionLocal() as db:
+            lock_acquired = await try_acquire_session_advisory_lock(
+                db,
+                _MARKET_RUNTIME_DB_LOCK_KEY,
+                lock_name="runtime:market:cycle",
+            )
+            if not lock_acquired:
+                await lease.release()
+                return
             try:
                 await self.refresh_market_snapshot(db)
             except Exception:
                 await db.rollback()
                 logger.exception("market_runtime_cycle_failed")
+            finally:
+                await release_session_advisory_lock(db, _MARKET_RUNTIME_DB_LOCK_KEY)
+                await lease.release()
 
     async def refresh_market_snapshot(
         self,
@@ -218,8 +236,53 @@ class MarketRuntimeService:
                     return cached
         snapshot = await self._build_snapshot_from_db(db)
         if snapshot is not None:
+            await self._cache.set_json(
+                _SNAPSHOT_CACHE_KEY,
+                snapshot,
+                ttl_seconds=max(self._poll_interval_seconds + 15, self._settings.market_cache_ttl_seconds),
+            )
             return snapshot
         return await self.refresh_market_snapshot(db, force_refresh=True)
+
+    async def request_market_snapshot_refresh(self, db: AsyncSession) -> dict[str, Any]:
+        cached = await self._cache.get_json(_SNAPSHOT_CACHE_KEY)
+        if isinstance(cached, dict):
+            updated_at = _parse_datetime(cached.get("updatedAt"))
+            if updated_at is not None:
+                age_seconds = max(0.0, (_utc_now() - updated_at).total_seconds())
+                if age_seconds <= max(10, self._poll_interval_seconds):
+                    await self._ensure_manual_refresh_task()
+                    return cached
+        snapshot = await self._build_snapshot_from_db(db)
+        if snapshot is not None:
+            await self._cache.set_json(
+                _SNAPSHOT_CACHE_KEY,
+                snapshot,
+                ttl_seconds=max(self._poll_interval_seconds + 15, self._settings.market_cache_ttl_seconds),
+            )
+            await self._ensure_manual_refresh_task()
+            return snapshot
+        return await self.refresh_market_snapshot(db, force_refresh=True)
+
+    async def _ensure_manual_refresh_task(self) -> None:
+        async with self._manual_refresh_lock:
+            task = self._manual_refresh_task
+            if task is not None and not task.done():
+                return
+            self._manual_refresh_task = asyncio.create_task(self._refresh_market_snapshot_in_background())
+
+    async def _refresh_market_snapshot_in_background(self) -> None:
+        try:
+            async with SessionLocal() as db:
+                await self.refresh_market_snapshot(db, force_refresh=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("market_manual_refresh_failed")
+        finally:
+            current_task = asyncio.current_task()
+            if self._manual_refresh_task is current_task:
+                self._manual_refresh_task = None
 
     async def list_recent_alerts(self, db: AsyncSession, *, limit: int = 6) -> list[dict[str, Any]]:
         rows = (
@@ -362,10 +425,16 @@ class MarketRuntimeService:
         }
 
     async def delete_target_alert(self, db: AsyncSession, *, user_id: str, target_id: str) -> bool:
-        alert = await db.get(UserTargetAlert, target_id)
-        if alert is None or alert.user_id != user_id:
+        deleted_id = await db.scalar(
+            delete(UserTargetAlert)
+            .where(
+                UserTargetAlert.id == target_id,
+                UserTargetAlert.user_id == user_id,
+            )
+            .returning(UserTargetAlert.id)
+        )
+        if deleted_id is None:
             return False
-        await db.delete(alert)
         await db.commit()
         return True
 

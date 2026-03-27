@@ -1,0 +1,24 @@
+{
+  "targetConnections": 10,
+  "attempted": 10,
+  "connected": 5,
+  "connectFailed": 5,
+  "closed": 5,
+  "activeAtEnd": 0,
+  "sentMessages": 10,
+  "receivedMessages": 15,
+  "durationSeconds": 22.99,
+  "connectLatencyMs": {
+    "p50": 118.71,
+    "p95": 615.44,
+    "p99": 615.44,
+    "max": 615.44
+  },
+  "backendMetrics": {
+    "xr_backend_ws_active_connections": 5.0,
+    "xr_backend_ws_active_users": 5.0
+  },
+  "errors": {
+    "TimeoutError": 5
+  }
+}
