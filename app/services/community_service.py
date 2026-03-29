@@ -95,14 +95,7 @@ class CommunityService:
         limit: int,
     ) -> list[CommunityPostResponse]:
         normalized_limit = max(1, min(limit, 100))
-        membership_priority = case(
-            (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
-            (
-                (User.membership_tier == MEMBERSHIP_TIER_PRO) | (User.is_pro.is_(True)),
-                1,
-            ),
-            else_=0,
-        )
+        membership_priority = self._membership_priority_case(self._now())
         normalized_symbol = normalize_symbol(symbol)
         stmt = (
             select(Post, User, CommunityProfile)
@@ -237,14 +230,7 @@ class CommunityService:
         *,
         limit: int,
     ) -> list[CommunityProfileResponse]:
-        membership_priority = case(
-            (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
-            (
-                (User.membership_tier == MEMBERSHIP_TIER_PRO) | (User.is_pro.is_(True)),
-                1,
-            ),
-            else_=0,
-        )
+        membership_priority = self._membership_priority_case(self._now())
         rows = (
             await db.execute(
                 select(User, CommunityProfile)
@@ -267,14 +253,7 @@ class CommunityService:
         limit: int,
     ) -> list[CommunityProfileResponse]:
         normalized_query = query.strip().lower()
-        membership_priority = case(
-            (User.membership_tier == MEMBERSHIP_TIER_LEGEND, 2),
-            (
-                (User.membership_tier == MEMBERSHIP_TIER_PRO) | (User.is_pro.is_(True)),
-                1,
-            ),
-            else_=0,
-        )
+        membership_priority = self._membership_priority_case(self._now())
         stmt = (
             select(User, CommunityProfile)
             .outerjoin(CommunityProfile, CommunityProfile.uid == User.id)
@@ -1192,6 +1171,23 @@ class CommunityService:
 
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+    def _membership_priority_case(self, now: datetime):
+        paid_active = or_(
+            User.paid_membership_expires_at.is_(None),
+            User.paid_membership_expires_at > now,
+        )
+        reward_active = User.reward_pro_expires_at > now
+        return case(
+            ((User.membership_tier == MEMBERSHIP_TIER_LEGEND) & paid_active, 2),
+            (
+                ((User.membership_tier == MEMBERSHIP_TIER_PRO) & paid_active)
+                | (User.is_pro.is_(True) & paid_active)
+                | reward_active,
+                1,
+            ),
+            else_=0,
+        )
 
     def _bad_request(self, detail: str) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)

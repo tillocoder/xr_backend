@@ -20,6 +20,7 @@ from app.services.db_runtime_lock_service import (
     release_session_advisory_lock,
     try_acquire_session_advisory_lock,
 )
+from app.services.daily_reward_service import DailyRewardService
 from app.services.notification_service import NotificationService
 from app.services.periodic_runtime_service import PeriodicRuntimeService
 from app.services.runtime_lease_service import RuntimeLeaseService
@@ -118,6 +119,7 @@ class MarketRuntimeService(PeriodicRuntimeService):
         self._cache = cache
         self._notification_service = notification_service
         self._lease_service = lease_service
+        self._daily_rewards = DailyRewardService()
         self._poll_interval_seconds = max(
             30, int(poll_interval_seconds or settings.market_poll_interval_seconds)
         )
@@ -217,9 +219,14 @@ class MarketRuntimeService(PeriodicRuntimeService):
         prefs = SmartSignalPreferences.from_user_settings(user.settings_json if user else {})
         targets = await self.list_target_alerts(db, user_id=user_id, snapshot=snapshot)
         recent_alerts = await self.list_recent_alerts(db, limit=6)
+        membership_tier = (
+            self._daily_rewards.effective_membership_tier_user(user)
+            if user is not None
+            else "free"
+        )
         return {
             "isPro": is_pro,
-            "membershipTier": getattr(user, "membership_tier", "free"),
+            "membershipTier": membership_tier,
             "preferences": prefs.to_json(),
             "targets": targets,
             "snapshot": snapshot,
@@ -494,11 +501,12 @@ class MarketRuntimeService(PeriodicRuntimeService):
     def user_has_pro_access(self, user: User | None) -> bool:
         if user is None:
             return False
-        if str(user.membership_tier or "").strip().lower() != "free":
+        paid_tier = self._daily_rewards.paid_membership_tier_user(user)
+        if paid_tier != "free":
             return True
         expires_at = user.reward_pro_expires_at
         if expires_at is None:
-            return bool(user.is_pro)
+            return bool(user.is_pro and paid_tier != "free")
         return expires_at >= _utc_now()
 
     async def _load_active_target_coin_ids(self, db: AsyncSession) -> list[str]:
