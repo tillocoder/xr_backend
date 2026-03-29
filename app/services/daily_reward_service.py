@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.entities import Post, User
+from app.models.entities import CommunityProfile, Post, User
 from app.services.membership_tiers import (
     MEMBERSHIP_TIER_FREE,
     MEMBERSHIP_TIER_LEGEND,
@@ -62,13 +62,15 @@ class DailyRewardService:
         user_id: str,
     ) -> tuple[User, DailyRewardStatus]:
         user, created = await self._ensure_user(db, user_id)
-        changed = await self._maybe_activate_reward_pro(db, user)
+        changed = await self._sync_paid_membership_state(db, user)
+        changed = await self._maybe_activate_reward_pro(db, user) or changed
         if created or changed:
             await db.commit()
         return user, self._status_from_user(user)
 
     async def claim(self, db: AsyncSession, *, user_id: str) -> DailyRewardStatus:
         user, _ = await self._ensure_user(db, user_id)
+        await self._sync_paid_membership_state(db, user)
         now = self._now()
         today = self._reward_day(now)
         last_claimed_at = self._normalize_datetime(user.daily_reward_last_claimed_at)
@@ -93,14 +95,16 @@ class DailyRewardService:
 
     async def get_or_create_user(self, db: AsyncSession, *, user_id: str) -> User:
         user, created = await self._ensure_user(db, user_id)
-        changed = await self._maybe_activate_reward_pro(db, user)
+        changed = await self._sync_paid_membership_state(db, user)
+        changed = await self._maybe_activate_reward_pro(db, user) or changed
         if created or changed:
             await db.commit()
         return user
 
     async def is_effective_pro(self, db: AsyncSession, *, user_id: str) -> bool:
         user, created = await self._ensure_user(db, user_id)
-        changed = await self._maybe_activate_reward_pro(db, user)
+        changed = await self._sync_paid_membership_state(db, user)
+        changed = await self._maybe_activate_reward_pro(db, user) or changed
         if created or changed:
             await db.commit()
         return self.is_effective_pro_user(user)
@@ -114,10 +118,14 @@ class DailyRewardService:
             and self.is_reward_pro_active(user, now=now)
         )
 
-    def paid_membership_tier_user(self, user: User) -> str:
+    def paid_membership_tier_user(self, user: User, *, now: datetime | None = None) -> str:
+        current_time = now or self._now()
         paid_tier = normalize_membership_tier(getattr(user, "membership_tier", None))
         if paid_tier != MEMBERSHIP_TIER_FREE:
-            return paid_tier
+            expires_at = self._normalize_datetime(getattr(user, "paid_membership_expires_at", None))
+            if expires_at is None or expires_at > current_time:
+                return paid_tier
+            return MEMBERSHIP_TIER_FREE
         if bool(user.is_pro):
             return MEMBERSHIP_TIER_PRO
         return MEMBERSHIP_TIER_FREE
@@ -128,7 +136,7 @@ class DailyRewardService:
         *,
         now: datetime | None = None,
     ) -> str:
-        paid_tier = self.paid_membership_tier_user(user)
+        paid_tier = self.paid_membership_tier_user(user, now=now)
         if paid_tier == MEMBERSHIP_TIER_LEGEND:
             return MEMBERSHIP_TIER_LEGEND
         if paid_tier == MEMBERSHIP_TIER_PRO:
@@ -137,8 +145,8 @@ class DailyRewardService:
             return MEMBERSHIP_TIER_PRO
         return MEMBERSHIP_TIER_FREE
 
-    def is_paid_membership_active_user(self, user: User) -> bool:
-        return is_paid_membership_tier(self.paid_membership_tier_user(user))
+    def is_paid_membership_active_user(self, user: User, *, now: datetime | None = None) -> bool:
+        return is_paid_membership_tier(self.paid_membership_tier_user(user, now=now))
 
     def is_reward_pro_active(self, user: User, *, now: datetime | None = None) -> bool:
         expires_at = self._normalize_datetime(user.reward_pro_expires_at)
@@ -180,7 +188,7 @@ class DailyRewardService:
         now: datetime | None = None,
     ) -> bool:
         current_time = now or self._now()
-        if self.is_paid_membership_active_user(user) or self.is_reward_pro_active(
+        if self.is_paid_membership_active_user(user, now=current_time) or self.is_reward_pro_active(
             user,
             now=current_time,
         ):
@@ -202,7 +210,7 @@ class DailyRewardService:
         can_claim_now = last_claimed_day != today
         next_claim_at = None if can_claim_now else self._next_claim_at(today)
         reward_pro_active = self.is_reward_pro_active(user, now=current_time)
-        membership_tier = self.paid_membership_tier_user(user)
+        membership_tier = self.paid_membership_tier_user(user, now=current_time)
         effective_membership_tier = self.effective_membership_tier_user(
             user,
             now=current_time,
@@ -228,11 +236,40 @@ class DailyRewardService:
             reward_pro_expires_at=reward_pro_expires_at if reward_pro_active else None,
             membership_tier=membership_tier,
             effective_membership_tier=effective_membership_tier,
-            paid_pro_active=self.is_paid_membership_active_user(user),
+            paid_pro_active=self.is_paid_membership_active_user(user, now=current_time),
             reward_pro_active=reward_pro_active,
             effective_pro_active=effective_membership_tier != MEMBERSHIP_TIER_FREE,
             reward_pro_remaining_seconds=remaining_seconds,
         )
+
+    async def _sync_paid_membership_state(self, db: AsyncSession, user: User) -> bool:
+        current_time = self._now()
+        paid_tier = normalize_membership_tier(getattr(user, "membership_tier", None))
+        expires_at = self._normalize_datetime(getattr(user, "paid_membership_expires_at", None))
+        changed = False
+
+        if paid_tier != MEMBERSHIP_TIER_FREE:
+            if expires_at is not None and expires_at <= current_time:
+                user.membership_tier = MEMBERSHIP_TIER_FREE
+                user.is_pro = False
+                user.paid_membership_plan_code = None
+                changed = True
+            elif not bool(user.is_pro):
+                user.is_pro = True
+                changed = True
+        elif bool(user.is_pro) and expires_at is not None and expires_at <= current_time:
+            user.is_pro = False
+            user.paid_membership_plan_code = None
+            changed = True
+
+        if not changed:
+            return False
+
+        profile = await db.get(CommunityProfile, user.id)
+        if profile is not None:
+            profile.is_pro = bool(user.is_pro)
+        await db.flush()
+        return True
 
     def _next_claim_at(self, today: date) -> datetime:
         next_local = datetime.combine(today + timedelta(days=1), time.min, tzinfo=_REWARD_TZ)

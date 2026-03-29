@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.membership_tiers import MEMBERSHIP_TIER_FREE
 
@@ -69,26 +69,3 @@ class MembershipPlanResponse(BaseModel):
 class MembershipCatalogResponse(BaseModel):
     proPlans: list[MembershipPlanResponse] = Field(default_factory=list)
     legendPlans: list[MembershipPlanResponse] = Field(default_factory=list)
-
-
-class MembershipPurchaseIntentRequest(BaseModel):
-    tier: str
-    planCode: str
-
-    @field_validator("tier")
-    @classmethod
-    def _normalize_tier(cls, value: str) -> str:
-        return value.strip().lower()
-
-
-class MembershipPurchaseIntentResponse(BaseModel):
-    checkoutToken: str
-    tier: str
-    planCode: str
-    status: str
-    title: str
-    durationMonths: int
-    priceAmount: float
-    currency: str
-    displayPrice: str
-    message: str

@@ -17,8 +17,6 @@ from app.schemas.me import (
     MeBootstrapPayload,
     MeHoldingsPayload,
     MembershipCatalogResponse,
-    MembershipPurchaseIntentRequest,
-    MembershipPurchaseIntentResponse,
     MeWalletsPayload,
     MeWatchlistPayload,
 )
@@ -63,20 +61,6 @@ async def get_membership_offers(
 ) -> MembershipCatalogResponse:
     del current_user
     return _ME_SERVICE.get_membership_catalog()
-
-
-@router.post("/membership/purchase-intent", response_model=MembershipPurchaseIntentResponse)
-async def create_membership_purchase_intent(
-    payload: MembershipPurchaseIntentRequest,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> MembershipPurchaseIntentResponse:
-    return await _ME_SERVICE.create_membership_purchase_intent(
-        db,
-        user_id=current_user.id,
-        tier=payload.tier,
-        plan_code=payload.planCode,
-    )
 
 
 @router.put("/settings")

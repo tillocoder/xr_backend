@@ -34,6 +34,8 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(512))
     membership_tier: Mapped[str] = mapped_column(String(16), default="free", nullable=False)
     is_pro: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    paid_membership_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paid_membership_plan_code: Mapped[str | None] = mapped_column(String(32))
     diamonds_balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     daily_reward_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     daily_reward_last_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -493,3 +495,4 @@ class NewsFeedState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
