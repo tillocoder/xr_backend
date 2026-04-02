@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
@@ -26,6 +26,7 @@ from app.models.entities import (
     PushToken,
     User,
 )
+from app.presentation.api.request_state import get_auth_session_service
 from app.schemas.admin_dashboard import AdminOverviewResponse, AdminStatsResponse
 from app.services.ai_provider_config_service import (
     DEFAULT_GEMINI_MODEL,
@@ -36,6 +37,7 @@ from app.services.ai_provider_config_service import (
     rebalance_gemini_config_rows,
 )
 from app.services.admin_dashboard_service import AdminDashboardService
+from app.services.user_service import ensure_user_exists
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -102,6 +104,27 @@ class AdminAuthSessionItem(BaseModel):
 class AdminAuthSessionListResponse(BaseModel):
     items: list[AdminAuthSessionItem] = Field(default_factory=list)
     total: int = 0
+
+
+class AdminIssueUserSessionRequest(BaseModel):
+    userId: str | None = None
+    displayName: str | None = None
+    isPro: bool = False
+
+
+class AdminIssuedUserSessionUser(BaseModel):
+    id: str
+    displayName: str
+    isPro: bool
+
+
+class AdminIssuedUserSessionResponse(BaseModel):
+    accessToken: str
+    refreshToken: str
+    authorizationHeader: str
+    accessExpiresAt: datetime
+    refreshExpiresAt: datetime
+    user: AdminIssuedUserSessionUser
 
 
 class AiProviderConfigCreate(BaseModel):
@@ -195,6 +218,48 @@ async def get_admin_overview(
     db: AsyncSession = Depends(get_db),
 ) -> AdminOverviewResponse:
     return await _admin_dashboard_service.get_overview(db, days=days)
+
+
+@router.post("/issue-user-session", response_model=AdminIssuedUserSessionResponse)
+async def issue_admin_user_session(
+    payload: AdminIssueUserSessionRequest,
+    request: Request,
+    _: str = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminIssuedUserSessionResponse:
+    user_id = (payload.userId or "").strip() or f"swagger_{secrets.token_hex(10)}"
+    display_name = (payload.displayName or "").strip() or "Swagger Test User"
+    user = await ensure_user_exists(
+        db,
+        user_id,
+        display_name=display_name,
+        is_pro=payload.isPro,
+    )
+
+    changed = False
+    if user.display_name != display_name:
+        user.display_name = display_name
+        changed = True
+    if bool(user.is_pro) != bool(payload.isPro):
+        user.is_pro = bool(payload.isPro)
+        user.membership_tier = "pro" if user.is_pro else "free"
+        changed = True
+    if changed:
+        await db.flush()
+
+    session = await get_auth_session_service(request).issue_session(db, user_id=user.id)
+    return AdminIssuedUserSessionResponse(
+        accessToken=session.access_token,
+        refreshToken=session.refresh_token,
+        authorizationHeader=f"Bearer {session.access_token}",
+        accessExpiresAt=session.access_expires_at,
+        refreshExpiresAt=session.refresh_expires_at,
+        user=AdminIssuedUserSessionUser(
+            id=user.id,
+            displayName=user.display_name,
+            isPro=user.is_pro,
+        ),
+    )
 
 
 @router.get("/users", response_model=AdminUserListResponse)

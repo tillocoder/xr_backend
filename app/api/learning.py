@@ -9,6 +9,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.public_url import get_public_base_url_for_request
 from app.db.session import get_db
 from app.presentation.api.json_cache import JsonRouteCache
 from app.presentation.api.request_state import get_notification_service
@@ -205,7 +206,7 @@ def _render_admin_page(
         [item.model_dump(mode="json") for item in lessons],
         ensure_ascii=False,
     ).replace("</", "<\\/")
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_public_base_url_for_request(request).rstrip("/")
     api_base = f"{base_url}/admin/learning"
     return _ADMIN_PAGE_TEMPLATE.replace("__LESSONS_JSON__", payload).replace(
         "__API_BASE__",

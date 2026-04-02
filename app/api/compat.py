@@ -16,10 +16,12 @@ from app.db.session import get_db
 from app.models.entities import User
 from app.presentation.api.request_state import (
     get_auth_session_service,
+    get_google_identity_service,
     get_optional_cache,
     get_settings_value,
 )
 from app.services.auth_session_service import AuthSessionService
+from app.services.google_identity_service import GoogleIdentityService
 from app.services.news_query_service import (
     build_news_cache_revision,
     build_news_feed_payload,
@@ -78,12 +80,6 @@ class NewsReadIn(BaseModel):
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _make_uid(email: str | None, id_token: str) -> str:
-    seed = (email or id_token).strip().lower()
-    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:32]
-
 
 def _make_news_etag(*parts: object) -> str:
     seed = "|".join(str(part or "").strip() for part in parts)
@@ -478,9 +474,22 @@ async def auth_google(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
-    user_id = _make_uid(payload.email, payload.idToken)
-    display_name = (payload.displayName or "").strip() or "XR HODL Member"
-    photo_url = (payload.photoUrl or "").strip() or None
+    google_identity_service: GoogleIdentityService = get_google_identity_service(request)
+    try:
+        identity = await google_identity_service.verify_id_token(payload.idToken)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    user_id = identity.user_id
+    display_name = (
+        identity.display_name
+        or (payload.displayName or "").strip()
+        or "XR HODL Member"
+    )
+    photo_url = identity.photo_url or (payload.photoUrl or "").strip() or None
+    email = identity.email or (payload.email or "").strip() or None
 
     user = await ensure_user_exists(
         db,
@@ -500,7 +509,7 @@ async def auth_google(
 
     session_payload = {
         "user_id": user_id,
-        "email": (payload.email or "").strip() or None,
+        "email": email,
         "display_name": display_name,
         "photo_url": photo_url,
     }

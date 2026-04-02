@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -17,6 +18,7 @@ from app.presentation.api.admin import learning_admin_router
 from app.presentation.api.admin import router as admin_router
 from app.presentation.api.v1 import router as api_v1_router
 from app.modules.system.presentation import router as system_router
+from app.presentation.http.admin_home import build_admin_home_html
 from app.presentation.http.middleware import (
     ObservabilityMiddleware,
     RateLimitMiddleware,
@@ -63,6 +65,27 @@ def create_app() -> FastAPI:
     app.include_router(api_v1_router, prefix=settings.api_prefix)
     if settings.admin_features_enabled:
         setup_admin_panel(app)
+
+        async def admin_home(request: Request) -> HTMLResponse:
+            current_origin = str(request.base_url).rstrip("/")
+            html = build_admin_home_html(
+                current_origin=current_origin,
+                public_origin=settings.public_origin or current_origin,
+                project_name=settings.project_name,
+                api_prefix=settings.api_prefix,
+            )
+            return HTMLResponse(html)
+
+        app.add_api_route(
+            "/admin",
+            admin_home,
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            "/admin/",
+            admin_home,
+            include_in_schema=False,
+        )
         app.include_router(admin_router, prefix=settings.api_prefix)
         app.include_router(learning_admin_router)
     elif settings.admin_panel_enabled:

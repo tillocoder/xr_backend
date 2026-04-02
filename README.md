@@ -1,4 +1,4 @@
-# XR Hodl Backend
+# XR Invest Backend
 
 FastAPI backend skeleton for scalable community/chat realtime delivery.
 
@@ -37,6 +37,17 @@ uvicorn app.main:app --reload --port 8000
 This backend ships with a built-in admin panel at:
 
 - `http://127.0.0.1:8000/admin-panel`
+- `https://api.xrinvest.uz/admin-panel/`
+- Admin Home landing page: `https://api.xrinvest.uz/admin`
+
+`/admin` now opens a lightweight Admin Home page with direct links to:
+
+- the SQL admin panel
+- learning video admin
+- `/health`
+- `/docs`
+
+If you later want `https://xrinvest.uz/admin` on the root domain, point that path to this backend or add a Cloudflare reverse-proxy rule.
 
 Credentials are controlled via env vars (defaults are dev-only):
 
@@ -88,6 +99,14 @@ This removes the USB or `localhost` dependency for testing on a real phone, but 
 .\scripts\start_backend_for_tunnel.ps1
 ```
 
+If you want to watch incoming requests live in the console while testing:
+
+```powershell
+.\scripts\start_backend_with_request_logs.ps1
+```
+
+This mode prints request lines like `GET /api/v1/... -> 200` so you can watch app traffic in real time.
+
 3. Install Cloudflare Tunnel on Windows:
 
 ```powershell
@@ -100,7 +119,7 @@ winget install --id Cloudflare.cloudflared
 .\scripts\start_cloudflare_quick_tunnel.ps1
 ```
 
-5. Cloudflare prints a random `https://<name>.trycloudflare.com` URL.
+5. If you are still testing locally, Cloudflare prints a random `https://<name>.trycloudflare.com` URL.
 Use that URL as the mobile app API base URL instead of `http://localhost:8000`.
 
 Useful notes:
@@ -108,11 +127,36 @@ Useful notes:
 - HTTP API example: `https://<name>.trycloudflare.com/api/v1/...`
 - WebSocket example: `wss://<name>.trycloudflare.com/api/v1/ws?user_id=<id>`
 - Media files will also resolve through the same public host.
-- If you later create a permanent Cloudflare hostname, set `XR_PUBLIC_BASE_URL` to that public `https://...` URL.
+- Permanent API domain example: `https://api.xrinvest.uz`
+- Set `XR_PUBLIC_BASE_URL=https://api.xrinvest.uz` so backend-generated media and websocket URLs use your real domain.
 
 Firebase push default credential file is expected at:
 
 `backend/credentials/firebase-admin.json`
+
+## Auto start on Windows
+
+If you want the backend and named Cloudflare tunnel to auto-start when you sign in on Windows:
+
+```powershell
+cd C:\XR HODL\backend
+.\scripts\install_backend_stack_startup_task.ps1
+```
+
+If Task Scheduler is blocked by Windows policy, the installer falls back to the current user's Startup folder automatically.
+
+Manual launcher:
+
+```powershell
+cd C:\XR HODL\backend
+.\scripts\start_backend_stack.ps1
+```
+
+This launcher is idempotent:
+
+- if backend is already listening on `127.0.0.1:8000`, it does not start a duplicate
+- if `cloudflared tunnel run xrinvest-backend` is already running, it does not start a duplicate
+- logs are written under `runtime-logs/`
 
 ## Demo auth
 
