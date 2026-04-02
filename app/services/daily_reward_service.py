@@ -188,16 +188,22 @@ class DailyRewardService:
         now: datetime | None = None,
     ) -> bool:
         current_time = now or self._now()
-        if self.is_paid_membership_active_user(user, now=current_time) or self.is_reward_pro_active(
-            user,
-            now=current_time,
-        ):
+        if self.is_paid_membership_active_user(user, now=current_time):
             return False
         balance = self._non_negative_int(user.diamonds_balance)
         if balance < self.reward_pro_cost:
             return False
-        user.diamonds_balance = balance - self.reward_pro_cost
-        user.reward_pro_expires_at = current_time + timedelta(days=self.reward_pro_duration_days)
+        reward_pro_expires_at = self._normalize_datetime(user.reward_pro_expires_at)
+        next_expiry = current_time
+        if reward_pro_expires_at is not None and reward_pro_expires_at > current_time:
+            next_expiry = reward_pro_expires_at
+
+        while balance >= self.reward_pro_cost:
+            balance -= self.reward_pro_cost
+            next_expiry += timedelta(days=self.reward_pro_duration_days)
+
+        user.diamonds_balance = balance
+        user.reward_pro_expires_at = next_expiry
         await db.flush()
         return True
 

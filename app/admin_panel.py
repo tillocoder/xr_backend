@@ -28,6 +28,7 @@ from app.models.entities import (
     PostView,
     PushToken,
     User,
+    UserTargetAlert,
     NewsArticle,
     NewsArticleTranslation,
 )
@@ -82,6 +83,104 @@ class UserAdmin(ModelView, model=User):
     column_searchable_list = [User.id, User.username, User.display_name]
     column_default_sort = (User.created_at, True)
     form_excluded_columns = [User.created_at, User.updated_at]
+
+    async def delete_model(self, request: Request, pk: str) -> None:
+        await anyio.to_thread.run_sync(self._delete_model_sync, pk)
+
+    def _delete_model_sync(self, pk: str) -> None:
+        with self.session_maker(expire_on_commit=False) as session:
+            user = session.execute(self._stmt_by_identifier(pk)).scalars().first()
+            if user is None:
+                return
+            self._delete_dependencies_sync(session, user.id)
+            session.delete(user)
+            session.commit()
+
+    def _delete_dependencies_sync(self, session, user_id: str) -> None:
+        authored_post_ids = list(
+            session.execute(select(Post.id).where(Post.author_id == user_id)).scalars().all()
+        )
+        if authored_post_ids:
+            post_comment_ids = list(
+                session.execute(select(Comment.id).where(Comment.post_id.in_(authored_post_ids))).scalars().all()
+            )
+            if post_comment_ids:
+                session.execute(
+                    update(Comment)
+                    .where(Comment.reply_to_comment_id.in_(post_comment_ids))
+                    .values(reply_to_comment_id=None)
+                )
+                session.execute(
+                    delete(CommentReaction).where(CommentReaction.comment_id.in_(post_comment_ids))
+                )
+                session.execute(delete(Comment).where(Comment.id.in_(post_comment_ids)))
+            session.execute(delete(PollVote).where(PollVote.post_id.in_(authored_post_ids)))
+            session.execute(delete(PostView).where(PostView.post_id.in_(authored_post_ids)))
+            session.execute(delete(PostReaction).where(PostReaction.post_id.in_(authored_post_ids)))
+            session.execute(delete(Post).where(Post.id.in_(authored_post_ids)))
+
+        remaining_comment_stmt = select(Comment.id, Comment.post_id).where(Comment.author_id == user_id)
+        if authored_post_ids:
+            remaining_comment_stmt = remaining_comment_stmt.where(~Comment.post_id.in_(authored_post_ids))
+        authored_comments = list(session.execute(remaining_comment_stmt).all())
+        if authored_comments:
+            authored_comment_ids = [str(comment_id) for comment_id, _ in authored_comments]
+            affected_post_ids = sorted({str(post_id) for _, post_id in authored_comments})
+            session.execute(
+                update(Comment)
+                .where(Comment.reply_to_comment_id.in_(authored_comment_ids))
+                .values(reply_to_comment_id=None)
+            )
+            session.execute(
+                delete(CommentReaction).where(CommentReaction.comment_id.in_(authored_comment_ids))
+            )
+            session.execute(delete(Comment).where(Comment.id.in_(authored_comment_ids)))
+            for post_id in affected_post_ids:
+                remaining_count = int(
+                    session.execute(
+                        select(func.count(Comment.id)).where(Comment.post_id == post_id)
+                    ).scalar()
+                    or 0
+                )
+                session.execute(
+                    update(Post)
+                    .where(Post.id == post_id)
+                    .values(comment_count=remaining_count)
+                )
+
+        authored_message_ids = list(
+            session.execute(select(Message.id).where(Message.sender_id == user_id)).scalars().all()
+        )
+        if authored_message_ids:
+            session.execute(
+                update(Message)
+                .where(Message.reply_to_message_id.in_(authored_message_ids))
+                .values(reply_to_message_id=None)
+            )
+            session.execute(
+                update(Chat)
+                .where(Chat.last_message_id.in_(authored_message_ids))
+                .values(last_message_id=None)
+            )
+            session.execute(
+                update(ChatMember)
+                .where(ChatMember.last_read_message_id.in_(authored_message_ids))
+                .values(last_read_message_id=None)
+            )
+            session.execute(delete(Message).where(Message.id.in_(authored_message_ids)))
+
+        session.execute(delete(ChatMember).where(ChatMember.user_id == user_id))
+        session.execute(delete(CommunityFollow).where(CommunityFollow.follower_uid == user_id))
+        session.execute(delete(CommunityFollow).where(CommunityFollow.following_uid == user_id))
+        session.execute(delete(PostReaction).where(PostReaction.user_id == user_id))
+        session.execute(delete(PostView).where(PostView.user_id == user_id))
+        session.execute(delete(PollVote).where(PollVote.user_id == user_id))
+        session.execute(delete(CommentReaction).where(CommentReaction.user_id == user_id))
+        session.execute(delete(Notification).where(Notification.user_id == user_id))
+        session.execute(delete(PushToken).where(PushToken.user_id == user_id))
+        session.execute(delete(AuthSession).where(AuthSession.user_id == user_id))
+        session.execute(delete(CommunityProfile).where(CommunityProfile.uid == user_id))
+        session.execute(delete(UserTargetAlert).where(UserTargetAlert.user_id == user_id))
 
 
 class CommunityProfileAdmin(ModelView, model=CommunityProfile):

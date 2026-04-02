@@ -7,6 +7,7 @@ from fastapi import Request
 from app.core.public_url import get_public_base_url_for_request
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
+from app.services.google_identity_service import GoogleIdentityService
 
 
 def get_settings_value(
@@ -25,6 +26,10 @@ def get_optional_cache(request: Request) -> RedisCache | None:
 
 def get_auth_session_service(request: Request) -> AuthSessionService:
     return request.app.state.auth_session_service
+
+
+def get_google_identity_service(request: Request) -> GoogleIdentityService:
+    return request.app.state.google_identity_service
 
 
 def get_notification_service(request: Request):

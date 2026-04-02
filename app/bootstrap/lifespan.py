@@ -20,6 +20,7 @@ from app.services.ai_provider_config_service import (
 from app.services.auth_session_service import AuthSessionService
 from app.services.cache import RedisCache
 from app.services.firebase_push_service import FirebasePushService
+from app.services.google_identity_service import GoogleIdentityService
 from app.services.market_runtime_service import MarketRuntimeService
 from app.services.news_runtime_service import NewsRuntimeService
 from app.services.notification_service import NotificationService
@@ -65,6 +66,7 @@ def build_container() -> AppContainer:
     push_token_service = PushTokenService()
     auth_session_service = AuthSessionService()
     firebase_push_service = FirebasePushService(settings)
+    google_identity_service = GoogleIdentityService(settings)
     news_runtime_service = NewsRuntimeService(
         bus=bus,
         firebase_push_service=firebase_push_service,
@@ -103,6 +105,7 @@ def build_container() -> AppContainer:
         push_token_service=push_token_service,
         auth_session_service=auth_session_service,
         firebase_push_service=firebase_push_service,
+        google_identity_service=google_identity_service,
         news_runtime_service=news_runtime_service,
         market_runtime_service=market_runtime_service,
         notification_service=notification_service,

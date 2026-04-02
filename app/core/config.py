@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
     )
 
-    project_name: str = "XR Hodl Backend"
+    project_name: str = "XR Invest Backend"
     api_prefix: str = "/api/v1"
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/xrhodl"
@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     firebase_service_account_json: str = ""
     firebase_push_max_workers: int = 4
     firebase_push_max_concurrent_batches: int = 2
+    google_oauth_allowed_client_ids: str = (
+        "654847065414-99ghvqeg1hn6jbr5oo8vus4pabdjthsg.apps.googleusercontent.com,"
+        "654847065414-k58go2de7e1t3u4ales99gnhr2vtpchg.apps.googleusercontent.com"
+    )
+    google_oauth_require_verified_email: bool = True
     market_poll_interval_seconds: int = 45
     market_cache_ttl_seconds: int = 75
     market_tracked_limit: int = 20
@@ -146,6 +151,16 @@ class Settings(BaseSettings):
     @property
     def coordinated_runtime_services_enabled(self) -> bool:
         return self.redis_required_for_runtime or self.process_worker_count <= 1
+
+    @property
+    def google_oauth_allowed_client_ids_list(self) -> list[str]:
+        return list(
+            dict.fromkeys(
+                value.strip()
+                for value in str(self.google_oauth_allowed_client_ids or "").split(",")
+                if value.strip()
+            )
+        )
 
 
 @lru_cache
