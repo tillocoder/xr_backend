@@ -22,6 +22,7 @@ from app.services.user_service import ensure_user_exists
 from app.ws.bus import RedisEventBus
 
 logger = logging.getLogger(__name__)
+REACTION_NOTIFICATION_BATCH_SIZE = 10
 
 
 async def react_to_post(
@@ -58,9 +59,11 @@ async def react_to_post(
     existing_code = normalize_reaction_code(existing.reaction_type) if existing is not None else None
 
     next_reaction_code: int | None = normalized_code
+    reaction_total_delta = 0
     if existing is not None and existing_code == normalized_code:
         await db.delete(existing)
         next_reaction_code = None
+        reaction_total_delta = -1
         await cache.bump_post_reaction_count(post_id, str(normalized_code), -1)
     else:
         if existing is not None:
@@ -69,6 +72,7 @@ async def react_to_post(
             existing.reaction_type = storage_value
         else:
             db.add(PostReaction(post_id=post_id, user_id=user_id, reaction_type=storage_value))
+            reaction_total_delta = 1
         await cache.bump_post_reaction_count(post_id, str(normalized_code), 1)
 
     await db.commit()
@@ -81,6 +85,7 @@ async def react_to_post(
 
     updated_at = datetime.now(timezone.utc)
     next_reaction_key = normalize_reaction_key(next_reaction_code)
+    total_reactions = _reaction_count_total(normalized_counts)
     state = PostReactionStateOut(
         postId=post_id,
         authorUid=post_author_id,
@@ -93,9 +98,25 @@ async def react_to_post(
 
     _publish_reaction_change_async(bus=bus, state=state)
 
-    if post_author_id != user_id and next_reaction_code is not None:
-        title = "New reaction"
-        body = f"Your post received a {reaction_key} reaction."
+    reaction_notification_milestone = await _resolve_reaction_notification_milestone(
+        db,
+        post_id=post_id,
+        post_author_id=post_author_id,
+        reacting_user_id=user_id,
+        next_reaction_code=next_reaction_code,
+        total_reactions=total_reactions,
+        reaction_total_delta=reaction_total_delta,
+    )
+    if reaction_notification_milestone is not None:
+        title = "Reaction milestone"
+        body = f"Your post reached {total_reactions} reactions."
+        payload = {
+            "reaction_code": next_reaction_code,
+            "reaction_type": next_reaction_key,
+            "reaction_key": next_reaction_key,
+            "reaction_total": total_reactions,
+            "reaction_milestone": reaction_notification_milestone,
+        }
         if notification_service is not None:
             notification_service.queue_notification(
                 user_id=post_author_id,
@@ -104,11 +125,7 @@ async def react_to_post(
                 body=body,
                 actor_uid=user_id,
                 post_id=post_id,
-                extra_payload={
-                    "reaction_code": next_reaction_code,
-                    "reaction_type": next_reaction_key,
-                    "reaction_key": next_reaction_key,
-                },
+                extra_payload=payload,
             )
         else:
             notification = Notification(
@@ -119,9 +136,7 @@ async def react_to_post(
                     "body": body,
                     "post_id": post_id,
                     "actor_uid": user_id,
-                    "reaction_code": next_reaction_code,
-                    "reaction_type": next_reaction_key,
-                    "reaction_key": next_reaction_key,
+                    **payload,
                 },
             )
             db.add(notification)
@@ -170,6 +185,81 @@ def _publish_reaction_change_async(
             )
 
     asyncio.create_task(publish())
+
+
+async def _resolve_reaction_notification_milestone(
+    db: AsyncSession,
+    *,
+    post_id: str,
+    post_author_id: str,
+    reacting_user_id: str,
+    next_reaction_code: int | None,
+    total_reactions: int,
+    reaction_total_delta: int,
+) -> int | None:
+    if post_author_id == reacting_user_id or next_reaction_code is None:
+        return None
+
+    milestone = _reaction_notification_milestone(
+        total_reactions=total_reactions,
+        reaction_total_delta=reaction_total_delta,
+        last_notified_milestone=await _load_last_reaction_notification_milestone(
+            db,
+            post_id=post_id,
+            user_id=post_author_id,
+        ),
+    )
+    return milestone
+
+
+async def _load_last_reaction_notification_milestone(
+    db: AsyncSession,
+    *,
+    post_id: str,
+    user_id: str,
+) -> int:
+    payload = await db.scalar(
+        select(Notification.payload_json)
+        .where(
+            Notification.user_id == user_id,
+            Notification.event_type == "post.reaction",
+            Notification.payload_json["post_id"].as_string() == post_id,
+        )
+        .order_by(Notification.created_at.desc())
+        .limit(1)
+    )
+    if not isinstance(payload, dict):
+        return 0
+    return _coerce_reaction_milestone(payload.get("reaction_milestone"))
+
+
+def _reaction_notification_milestone(
+    *,
+    total_reactions: int,
+    reaction_total_delta: int,
+    last_notified_milestone: int,
+) -> int | None:
+    if reaction_total_delta <= 0:
+        return None
+    if total_reactions < REACTION_NOTIFICATION_BATCH_SIZE:
+        return None
+    if total_reactions % REACTION_NOTIFICATION_BATCH_SIZE != 0:
+        return None
+    milestone = total_reactions // REACTION_NOTIFICATION_BATCH_SIZE
+    if milestone <= max(0, last_notified_milestone):
+        return None
+    return milestone
+
+
+def _coerce_reaction_milestone(value: object) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _reaction_count_total(raw_counts: dict[int, int]) -> int:
+    return sum(max(0, int(value)) for value in raw_counts.values())
 
 
 async def _load_counts(db: AsyncSession, post_id: str) -> dict[str, int]:

@@ -115,11 +115,20 @@ def normalize_display_name(raw: object) -> str:
 
 
 def normalize_username(raw: object) -> str:
+    value = str(raw or "").strip().lower().lstrip("@")
     value = "".join(
         char
-        for char in str(raw or "").strip().lower()
+        for char in value
         if char.isalnum() or char in {"_", "."}
     )
+    while ".." in value or "__" in value or "._" in value or "_." in value:
+        value = (
+            value.replace("..", "_")
+            .replace("__", "_")
+            .replace("._", "_")
+            .replace("_.", "_")
+        )
+    value = value.strip("._")
     return value[:24]
 
 

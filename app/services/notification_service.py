@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,23 +117,31 @@ class NotificationService:
         )
 
     async def mark_read(self, db: AsyncSession, *, user_id: str, ids: list[str]) -> None:
-        normalized_ids = [item.strip() for item in ids if item.strip()]
+        normalized_ids = list(dict.fromkeys(item.strip() for item in ids if item.strip()))
         if not normalized_ids:
             return
-        await db.execute(
+        await self._prepare_low_latency_write(db)
+        result = await db.execute(
             update(Notification)
-            .where(Notification.user_id == user_id, Notification.id.in_(normalized_ids))
+            .where(
+                Notification.user_id == user_id,
+                Notification.id.in_(normalized_ids),
+                Notification.is_read.is_(False),
+            )
             .values(is_read=True)
+            .execution_options(synchronize_session=False)
         )
-        await db.commit()
+        await self._finish_low_latency_write(db, rowcount=result.rowcount)
 
     async def mark_all_read(self, db: AsyncSession, *, user_id: str) -> None:
-        await db.execute(
+        await self._prepare_low_latency_write(db)
+        result = await db.execute(
             update(Notification)
             .where(Notification.user_id == user_id, Notification.is_read.is_(False))
             .values(is_read=True)
+            .execution_options(synchronize_session=False)
         )
-        await db.commit()
+        await self._finish_low_latency_write(db, rowcount=result.rowcount)
 
     async def create_notification(
         self,
@@ -456,6 +464,23 @@ class NotificationService:
         )
         if invalid_tokens:
             await self._push_tokens.remove_tokens(db, invalid_tokens)
+
+    async def _prepare_low_latency_write(self, db: AsyncSession) -> None:
+        bind = db.get_bind()
+        if bind is None or bind.dialect.name != "postgresql":
+            return
+        await db.execute(text("SET LOCAL synchronous_commit TO OFF"))
+
+    async def _finish_low_latency_write(
+        self,
+        db: AsyncSession,
+        *,
+        rowcount: int | None,
+    ) -> None:
+        if (rowcount or 0) > 0:
+            await db.commit()
+            return
+        await db.rollback()
 
     async def _publish_broadcast_notifications(
         self,

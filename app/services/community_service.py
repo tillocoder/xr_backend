@@ -437,6 +437,10 @@ class CommunityService:
                 body=f"{normalize_display_name(actor.display_name) or 'XR HODL Member'} followed you.",
                 actor_uid=actor.id,
                 post_id=None,
+                extra_payload={
+                    "profile_uid": actor.id,
+                    "target_route": "/community",
+                },
             )
 
     async def unfollow(
@@ -1143,6 +1147,7 @@ class CommunityService:
                 body=f"{post.authorName} posted: {headline}",
                 actor_uid=actor.id,
                 post_id=post.id,
+                extra_payload={"target_route": "/community"},
             )
 
     async def _publish_notification(self, db: AsyncSession, user_id: str, notification) -> None:
