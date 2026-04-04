@@ -30,3 +30,4 @@ media/community_posts/
 media/community_profiles/avatars/
 media/community_profiles/covers/
 media/test_delete_both/
+credentials/firebase-admin.json
