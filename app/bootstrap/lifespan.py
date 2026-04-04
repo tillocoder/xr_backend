@@ -175,11 +175,23 @@ def _should_start_coordinated_runtime_services(container: AppContainer) -> bool:
     return False
 
 
+async def _probe_firebase_push(container: AppContainer) -> None:
+    if not container.firebase_push_service.is_configured:
+        return
+    is_healthy = await container.firebase_push_service.probe_configuration()
+    app_logger = logging.getLogger(__name__)
+    if is_healthy:
+        app_logger.info("firebase_push_probe_ok")
+        return
+    app_logger.warning("firebase_push_probe_failed")
+
+
 @asynccontextmanager
 async def lifespan(app):
     container = build_container()
     container.attach_to_app(app)
     await _run_startup_initialization(container)
+    await _probe_firebase_push(container)
 
     await container.bus.start(container.ws_manager.dispatch)
     await container.presence_runtime_service.start()

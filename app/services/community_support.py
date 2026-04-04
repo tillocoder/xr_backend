@@ -24,6 +24,7 @@ REACTION_KEY_BY_CODE = {
     5: "cry",
     6: "ok",
     7: "zor",
+    8: "party",
 }
 REACTION_CODES = tuple(REACTION_KEY_BY_CODE.keys())
 REACTION_KEYS = tuple(REACTION_KEY_BY_CODE.values())
@@ -49,6 +50,12 @@ REACTION_CODE_ALIASES = {
     "thumbsup": 6,
     "zor": 7,
     "fire": 7,
+    "party": 8,
+    "wow": 8,
+    "celebration": 8,
+    "confetti": 8,
+    "emoji_party": 8,
+    "rocket": 8,
 }
 
 

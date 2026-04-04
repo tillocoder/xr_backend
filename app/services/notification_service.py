@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -15,6 +16,28 @@ from app.schemas.ws import WsEnvelope
 from app.services.firebase_push_service import FirebasePushService
 from app.services.push_token_service import PushTokenService
 from app.ws.bus import RedisEventBus
+
+LOGGER = logging.getLogger(__name__)
+
+_FCM_RESERVED_DATA_KEYS = frozenset({
+    "collapse_key",
+    "from",
+    "google",
+    "message_type",
+})
+
+_FCM_DATA_KEY_ALIASES = {
+    "actor_uid": "actorUid",
+    "message_id": "messageId",
+    "message_type": "messageType",
+    "peer_id": "peerId",
+    "post_id": "postId",
+    "profile_uid": "profileUid",
+    "sender_avatar_url": "senderAvatarUrl",
+    "sender_display_name": "senderDisplayName",
+    "sender_username": "senderUsername",
+    "target_route": "targetRoute",
+}
 
 
 class NotificationService:
@@ -256,6 +279,10 @@ class NotificationService:
                         ).model_dump(mode="json"),
                     )
         except Exception:
+            LOGGER.exception(
+                "notification_create_async_failed",
+                extra={"user_id": user_id, "kind": kind},
+            )
             return
 
     async def create_broadcast_notification(
@@ -378,6 +405,14 @@ class NotificationService:
                     extra_payload=extra_payload,
                 )
         except Exception:
+            LOGGER.exception(
+                "notification_push_async_failed",
+                extra={
+                    "user_id": user_id,
+                    "notification_id": notification_id,
+                    "kind": kind,
+                },
+            )
             return
 
     async def serialize_notification(
@@ -442,20 +477,18 @@ class NotificationService:
         tokens = await self._push_tokens.list_tokens(db, user_id=user_id)
         if not tokens:
             return
-        push_data = {
+        push_data = self._normalize_push_data({
             "notificationId": notification_id,
+            "id": notification_id,
             "kind": kind,
+            "eventType": kind,
+            "title": title,
+            "body": body,
             "actorUid": actor_uid or "",
             "postId": post_id or "",
-        }
+        })
         if extra_payload:
-            push_data.update(
-                {
-                    str(key): str(value)
-                    for key, value in extra_payload.items()
-                    if value is not None
-                }
-            )
+            push_data.update(self._normalize_push_data(extra_payload))
         invalid_tokens = await self._firebase_push.send_to_tokens(
             tokens=tokens,
             title=title,
@@ -464,6 +497,28 @@ class NotificationService:
         )
         if invalid_tokens:
             await self._push_tokens.remove_tokens(db, invalid_tokens)
+
+    def _normalize_push_data(
+        self,
+        payload: dict[str, object],
+    ) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for raw_key, raw_value in payload.items():
+            if raw_value is None:
+                continue
+            key = str(raw_key).strip()
+            if not key:
+                continue
+            key = _FCM_DATA_KEY_ALIASES.get(key, key)
+            lowered_key = key.lower()
+            if lowered_key in _FCM_RESERVED_DATA_KEYS:
+                continue
+            if lowered_key.startswith("google.") or lowered_key.startswith("gcm."):
+                continue
+            value = str(raw_value)
+            if value:
+                normalized[key] = value
+        return normalized
 
     async def _prepare_low_latency_write(self, db: AsyncSession) -> None:
         bind = db.get_bind()
