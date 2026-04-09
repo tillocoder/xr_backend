@@ -120,6 +120,10 @@ class RedisEventBus:
     async def _listen(self, handler: TopicHandler) -> None:
         reconnect_delay = self._reconnect_delay_seconds
         while True:
+            if not self._redis_available():
+                await asyncio.sleep(
+                    max(0.2, self._redis_disabled_until - time.monotonic()),
+                )
             pubsub = self._client.pubsub()
             try:
                 try:

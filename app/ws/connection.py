@@ -26,6 +26,7 @@ _DROPPABLE_EVENT_TYPES = frozenset(
 class OutboundMessage:
     body: str
     event_type: str = ""
+    coalesce_key: str = ""
 
 
 class ManagedWebSocketConnection:
@@ -78,6 +79,10 @@ class ManagedWebSocketConnection:
     def enqueue(self, payload: OutboundMessage) -> EnqueueOutcome:
         if self._closed:
             return "closed"
+        if payload.coalesce_key:
+            queued = self._replace_coalesced(payload)
+            if queued:
+                return "queued"
         try:
             self._queue.put_nowait(payload)
             return "queued"
@@ -85,6 +90,20 @@ class ManagedWebSocketConnection:
             if payload.event_type in _DROPPABLE_EVENT_TYPES:
                 return "dropped"
             return "overflow"
+
+    def _replace_coalesced(self, payload: OutboundMessage) -> bool:
+        queued_items = getattr(self._queue, "_queue", None)
+        if queued_items is None:
+            return False
+        for index in range(len(queued_items) - 1, -1, -1):
+            queued_payload = queued_items[index]
+            if (
+                isinstance(queued_payload, OutboundMessage)
+                and queued_payload.coalesce_key == payload.coalesce_key
+            ):
+                queued_items[index] = payload
+                return True
+        return False
 
     async def close(self, *, code: int = 1000, reason: str | None = None) -> None:
         if self._closed:

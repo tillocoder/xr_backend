@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,14 +25,11 @@ class MeBootstrapPayload(BaseModel):
 
     settings: dict[str, Any] = Field(default_factory=dict)
     holdings: list[dict[str, Any]] = Field(default_factory=list)
-    linked_wallets: Annotated[
-        list[dict[str, Any]],
-        Field(
-            default_factory=list,
-            validation_alias="linkedWallets",
-            serialization_alias="linkedWallets",
-        ),
-    ]
+    linked_wallets: list[dict[str, Any]] = Field(
+        default_factory=list,
+        validation_alias="linkedWallets",
+        serialization_alias="linkedWallets",
+    )
     watchlist: list[str] = Field(default_factory=list)
 
 

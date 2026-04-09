@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     websocket_rate_limit_max_messages_per_ip: int = 180
     websocket_rate_limit_max_messages_per_user: int = 240
     websocket_send_timeout_seconds: float = 5.0
-    websocket_max_pending_messages_per_connection: int = 128
+    websocket_max_pending_messages_per_connection: int = 32
     websocket_max_rooms_per_connection: int = 64
     websocket_max_topics_per_connection: int = 256
     websocket_presence_ttl_seconds: int = 90

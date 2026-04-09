@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,11 +12,6 @@ from app.schemas.me import (
     PortfolioVoiceCommandResponse,
     PortfolioVoiceOperationResponse,
 )
-from app.services.ai_provider_config_service import (
-    GEMINI_SCOPE_DEFAULT,
-    GEMINI_SCOPE_PORTFOLIO,
-)
-from app.services.gemini_service import build_gemini_client
 
 
 class PortfolioVoiceNotConfiguredError(RuntimeError):
@@ -31,17 +26,7 @@ class PortfolioVoiceInterpretationError(RuntimeError):
     pass
 
 
-GeminiClientBuilder = Callable[..., Awaitable[object | None]]
-
-
 class PortfolioVoiceCommandService:
-    def __init__(
-        self,
-        *,
-        gemini_client_builder: GeminiClientBuilder | None = None,
-    ) -> None:
-        self._gemini_client_builder = gemini_client_builder or build_gemini_client
-
     async def interpret_transcript(
         self,
         db: AsyncSession,
@@ -62,51 +47,8 @@ class PortfolioVoiceCommandService:
                 applyMode="append",
                 operations=local_operations,
             )
-
-        gemini = await self._gemini_client_builder(
-            db,
-            usage_scope=GEMINI_SCOPE_PORTFOLIO,
-            fallback_scopes=(GEMINI_SCOPE_DEFAULT,),
-        )
-        if gemini is None:
-            raise PortfolioVoiceNotConfiguredError(
-                "Portfolio Gemini API key is not configured."
-            )
-
-        result = await gemini.generate_text(
-            prompt=_build_prompt(
-                transcript=clean_transcript,
-                app_language_code=app_language_code,
-                speech_locale_id=speech_locale_id,
-            ),
-            temperature=0.0,
-            timeout_seconds=18,
-            response_mime_type="application/json",
-            max_output_tokens=256,
-        )
-        if result is None or not str(getattr(result, "text", "") or "").strip():
-            raise PortfolioVoiceUnavailableError(
-                "Portfolio voice command is unavailable right now."
-            )
-
-        payload = _extract_json_object(result.text)
-        if payload is None:
-            raise PortfolioVoiceInterpretationError(
-                "Portfolio command response was not valid JSON."
-            )
-
-        operations = _parse_operations(payload, fallback_transcript=clean_transcript)
-        if not operations:
-            raise PortfolioVoiceInterpretationError(
-                _coerce_text(payload.get("message"))
-                or "Portfolio command could not be understood."
-            )
-
-        return PortfolioVoiceCommandResponse(
-            transcript=_coerce_text(payload.get("transcript")) or clean_transcript,
-            message=_coerce_text(payload.get("message")) or _default_message(operations),
-            applyMode=_parse_apply_mode(payload),
-            operations=operations,
+        raise PortfolioVoiceInterpretationError(
+            "Portfolio command could not be understood. Use a simple format like '0.3 ETH 3200 dan oldim'."
         )
 
     async def interpret_audio(
@@ -119,142 +61,10 @@ class PortfolioVoiceCommandService:
         app_language_code: str,
         speech_locale_id: str | None = None,
     ) -> PortfolioVoiceCommandResponse:
-        clean_mime_type = _normalize_audio_mime_type(mime_type, filename=filename)
-        if not audio_bytes:
-            raise ValueError("Audio is required.")
-        if clean_mime_type is None:
-            raise ValueError("Unsupported audio format.")
-
-        gemini = await self._gemini_client_builder(
-            db,
-            usage_scope=GEMINI_SCOPE_PORTFOLIO,
-            fallback_scopes=(GEMINI_SCOPE_DEFAULT,),
+        del db, audio_bytes, mime_type, filename, app_language_code, speech_locale_id
+        raise PortfolioVoiceUnavailableError(
+            "Portfolio voice audio is disabled. Send text like '0.3 ETH 3200 dan oldim'."
         )
-        if gemini is None:
-            raise PortfolioVoiceNotConfiguredError(
-                "Portfolio Gemini API key is not configured."
-            )
-
-        result = await gemini.generate_audio_text(
-            prompt=_build_audio_prompt(
-                app_language_code=app_language_code,
-                speech_locale_id=speech_locale_id,
-            ),
-            audio_bytes=audio_bytes,
-            mime_type=clean_mime_type,
-            temperature=0.0,
-            timeout_seconds=45,
-            response_mime_type="text/plain",
-            max_output_tokens=160,
-        )
-        if result is None or not str(getattr(result, "text", "") or "").strip():
-            raise PortfolioVoiceUnavailableError(
-                "Portfolio voice command is unavailable right now."
-            )
-
-        transcript = _clean_text(str(getattr(result, "text", "") or ""))
-        if not transcript:
-            raise PortfolioVoiceInterpretationError(
-                "Portfolio command could not be understood."
-            )
-
-        try:
-            return await self.interpret_transcript(
-                db,
-                transcript=transcript,
-                app_language_code=app_language_code,
-                speech_locale_id=speech_locale_id,
-            )
-        except ValueError as exc:
-            raise PortfolioVoiceInterpretationError(
-                str(exc) or "Portfolio command could not be understood."
-            ) from exc
-        except PortfolioVoiceInterpretationError as exc:
-            raise PortfolioVoiceInterpretationError(
-                f"{str(exc) or 'Portfolio command could not be understood.'} "
-                f"Transcript: {transcript[:160]}"
-            ) from exc
-        except PortfolioVoiceUnavailableError:
-            local_operations = _parse_simple_transcript(transcript)
-            if not local_operations:
-                raise
-            return PortfolioVoiceCommandResponse(
-                transcript=transcript,
-                message=_default_message(local_operations),
-                applyMode="append",
-                operations=local_operations,
-            )
-
-
-def _build_prompt(
-    *,
-    transcript: str,
-    app_language_code: str,
-    speech_locale_id: str | None,
-) -> str:
-    language = _coerce_text(app_language_code) or "en"
-    locale_id = _coerce_text(speech_locale_id) or "unknown"
-    now = datetime.now(timezone.utc).isoformat()
-    return f"""
-Convert a short spoken crypto portfolio buy command into strict JSON for a mobile app.
-
-Current UTC time: {now}
-App language code: {language}
-Speech locale id: {locale_id}
-
-User transcript:
-{transcript}
-
-Rules:
-- Return JSON only. No markdown and no code fences.
-- Use exactly this shape:
-  {{
-    "transcript": "clean transcript",
-    "message": "short user-facing summary",
-    "applyMode": "append",
-    "operations": [
-      {{
-        "type": "add",
-        "symbol": "ETH",
-        "amount": 0.3,
-        "buyPrice": 3200,
-        "buyAt": "optional ISO-8601 datetime"
-      }}
-    ]
-  }}
-- type must be "add".
-- symbol must be a crypto ticker in uppercase without spaces.
-- Support any crypto asset, including new, niche, meme, and low-cap coins.
-- If the asset is recognizable, use its standard market ticker.
-- If the asset is uncommon but still understandable from the transcript, return the best uppercase symbol or asset token instead of failing.
-- amount and buyPrice must be positive numbers.
-- If the transcript is unclear, return an empty operations array and explain briefly in message.
-- Parse number words when reasonably confident.
-- Keep the message concise and in the same language as the transcript when possible.
-- Do not invent assets, prices, dates, or quantities.
-""".strip()
-
-
-def _build_audio_prompt(
-    *,
-    app_language_code: str,
-    speech_locale_id: str | None,
-) -> str:
-    language = _coerce_text(app_language_code) or "en"
-    locale_id = _coerce_text(speech_locale_id) or "unknown"
-    return f"""
-Transcribe the attached audio into plain text only.
-
-App language code: {language}
-Speech locale id: {locale_id}
-
-Rules:
-- Return plain text only.
-- Do not return JSON.
-- Do not explain anything.
-- Do not add markdown or quotes.
-- Preserve asset names, numbers, and prices as spoken as closely as possible.
-""".strip()
 
 
 _SYMBOL_ALIASES = {

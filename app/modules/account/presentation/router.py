@@ -150,24 +150,8 @@ async def process_portfolio_voice_command(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PortfolioVoiceNotConfiguredError as exc:
-        LOGGER.warning(
-            "portfolio_voice_audio_not_configured detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
-            str(exc),
-            current_user.id,
-            audio.filename,
-            audio.content_type,
-            len(audio_bytes) if "audio_bytes" in locals() else 0,
-        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PortfolioVoiceUnavailableError as exc:
-        LOGGER.warning(
-            "portfolio_voice_audio_unavailable detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
-            str(exc),
-            current_user.id,
-            audio.filename,
-            audio.content_type,
-            len(audio_bytes) if "audio_bytes" in locals() else 0,
-        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PortfolioVoiceInterpretationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -212,8 +196,24 @@ async def process_portfolio_voice_audio(
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PortfolioVoiceNotConfiguredError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_not_configured detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PortfolioVoiceUnavailableError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_unavailable detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PortfolioVoiceInterpretationError as exc:
         LOGGER.warning(

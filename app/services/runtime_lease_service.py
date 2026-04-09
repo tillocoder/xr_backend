@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from redis.asyncio.lock import Lock
 from redis.exceptions import RedisError
 
+from app.core.config import get_settings
 from app.services.cache import RedisCache
 
 
@@ -34,10 +35,32 @@ class RuntimeLeaseService:
         *,
         allow_best_effort_fallback: bool = True,
     ) -> None:
+        settings = get_settings()
         self._cache = cache
         self._allow_best_effort_fallback = bool(allow_best_effort_fallback)
+        self._redis_disabled_until = 0.0
+        self._redis_retry_after_seconds = max(1.0, float(settings.redis_retry_after_seconds))
+        self._redis_retry_after_max_seconds = max(
+            self._redis_retry_after_seconds,
+            float(settings.redis_retry_after_max_seconds),
+        )
+        self._redis_current_retry_after_seconds = self._redis_retry_after_seconds
         self._next_best_effort_warning_at = 0.0
         self._warning_interval_seconds = 60.0
+
+    def _redis_available(self) -> bool:
+        return time.monotonic() >= self._redis_disabled_until
+
+    def _mark_redis_unavailable(self) -> None:
+        self._redis_disabled_until = time.monotonic() + self._redis_current_retry_after_seconds
+        self._redis_current_retry_after_seconds = min(
+            self._redis_retry_after_max_seconds,
+            self._redis_current_retry_after_seconds * 2,
+        )
+
+    def _mark_redis_available(self) -> None:
+        self._redis_disabled_until = 0.0
+        self._redis_current_retry_after_seconds = self._redis_retry_after_seconds
 
     def _warn_best_effort_fallback(self, normalized_name: str) -> None:
         now = time.monotonic()
@@ -46,7 +69,10 @@ class RuntimeLeaseService:
         self._next_best_effort_warning_at = now + self._warning_interval_seconds
         logger.warning(
             "runtime_lease_best_effort_fallback",
-            extra={"lease": normalized_name},
+            extra={
+                "lease": normalized_name,
+                "retryAfterSeconds": round(self._redis_current_retry_after_seconds, 2),
+            },
         )
 
     async def acquire(
@@ -66,6 +92,11 @@ class RuntimeLeaseService:
             if best_effort_on_redis_error is None
             else bool(best_effort_on_redis_error)
         )
+        if not self._redis_available():
+            if not allow_best_effort_fallback:
+                return None
+            self._warn_best_effort_fallback(normalized_name)
+            return RuntimeLease(name=normalized_name)
         lock = self._cache.client.lock(
             normalized_name,
             timeout=max(5, int(ttl_seconds)),
@@ -79,6 +110,7 @@ class RuntimeLeaseService:
                 else None,
             )
         except RedisError:
+            self._mark_redis_unavailable()
             if not allow_best_effort_fallback:
                 logger.warning(
                     "runtime_lease_unavailable",
@@ -88,6 +120,7 @@ class RuntimeLeaseService:
             self._warn_best_effort_fallback(normalized_name)
             return RuntimeLease(name=normalized_name)
 
+        self._mark_redis_available()
         if not acquired:
             return None
         return RuntimeLease(name=normalized_name, _lock=lock)

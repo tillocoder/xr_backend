@@ -33,6 +33,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--host", type=str, default=None)
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--workers", type=int, default=None)
+    parser.add_argument("--expected-peak-ws", type=int, default=None)
+    parser.add_argument("--target-ws-per-worker", type=int, default=None)
     parser.add_argument("--backlog", type=int, default=None)
     parser.add_argument("--limit-concurrency", type=int, default=None)
     parser.add_argument("--limit-max-requests", type=int, default=None)
@@ -58,7 +60,19 @@ if __name__ == "__main__":
     os.environ.setdefault("XR_WEBSOCKET_RATE_LIMIT_MAX_MESSAGES_PER_USER", "600")
     host = (args.host or os.getenv("XR_BACKEND_HOST", "0.0.0.0")).strip() or "0.0.0.0"
     port = max(1, int(args.port)) if args.port is not None else _env_int("XR_BACKEND_PORT", 8000)
-    workers_default = min(8, max(2, os.cpu_count() or 2))
+    expected_peak_ws = (
+        max(1, int(args.expected_peak_ws))
+        if args.expected_peak_ws is not None
+        else _env_int("XR_BACKEND_EXPECTED_PEAK_WS_CONNECTIONS", 10000)
+    )
+    target_ws_per_worker = (
+        max(250, int(args.target_ws_per_worker))
+        if args.target_ws_per_worker is not None
+        else _env_int("XR_BACKEND_TARGET_WS_PER_WORKER", 2500)
+    )
+    cpu_workers_default = min(8, max(2, os.cpu_count() or 2))
+    ws_workers_default = max(1, (expected_peak_ws + target_ws_per_worker - 1) // target_ws_per_worker)
+    workers_default = min(8, max(cpu_workers_default, ws_workers_default))
     workers = max(1, int(args.workers)) if args.workers is not None else _env_int("XR_BACKEND_WORKERS", workers_default)
     os.environ["XR_PROCESS_WORKER_COUNT"] = str(workers)
     if workers > 1 and not redis_required_for_runtime:
@@ -66,11 +80,14 @@ if __name__ == "__main__":
             "XR_REDIS_REQUIRED_FOR_RUNTIME=false is not supported with multiple workers in run_prod.py. "
             "Enable Redis coordination or run a single worker."
         )
-    backlog = max(1, int(args.backlog)) if args.backlog is not None else _env_int("XR_BACKEND_BACKLOG", 2048)
+    backlog = max(1, int(args.backlog)) if args.backlog is not None else _env_int("XR_BACKEND_BACKLOG", 8192)
     limit_concurrency = (
         max(1, int(args.limit_concurrency))
         if args.limit_concurrency is not None
-        else _env_int("XR_BACKEND_LIMIT_CONCURRENCY", 20000)
+        else _env_int(
+            "XR_BACKEND_LIMIT_CONCURRENCY",
+            max(20000, expected_peak_ws + max(2000, workers * 500)),
+        )
     )
     limit_max_requests = (
         max(1, int(args.limit_max_requests))
@@ -92,7 +109,7 @@ if __name__ == "__main__":
         if args.timeout_graceful_shutdown is not None
         else _env_int("XR_BACKEND_TIMEOUT_GRACEFUL_SHUTDOWN_SECONDS", 30)
     )
-    ws_max_queue = max(1, int(args.ws_max_queue)) if args.ws_max_queue is not None else _env_int("XR_BACKEND_WS_MAX_QUEUE", 128)
+    ws_max_queue = max(1, int(args.ws_max_queue)) if args.ws_max_queue is not None else _env_int("XR_BACKEND_WS_MAX_QUEUE", 64)
     ws_max_size = max(1024, int(args.ws_max_size)) if args.ws_max_size is not None else _env_int("XR_BACKEND_WS_MAX_SIZE_BYTES", 1048576)
     ws_per_message_deflate = _env_bool("XR_BACKEND_WS_PER_MESSAGE_DEFLATE", False)
     access_log = args.access_log if args.access_log is not None else _env_bool("XR_BACKEND_ACCESS_LOG", True)

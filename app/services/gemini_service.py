@@ -8,6 +8,7 @@ import asyncio
 import base64
 import logging
 import os
+import re
 
 import httpx
 
@@ -29,6 +30,8 @@ class GeminiClient:
     _semaphore = asyncio.Semaphore(int(os.getenv("XR_GEMINI_MAX_CONCURRENCY", "2")))
     _cooldown_seconds = max(30, int(os.getenv("XR_GEMINI_KEY_COOLDOWN_SECONDS", "300")))
     _cooldowns: dict[str, float] = {}
+    _next_cooldown_warning_at = 0.0
+    _cooldown_warning_interval_seconds = max(30, min(_cooldown_seconds, 300))
 
     def __init__(self, configs: GeminiConfig | Sequence[GeminiConfig]):
         if isinstance(configs, GeminiConfig):
@@ -48,28 +51,47 @@ class GeminiClient:
         return f"{config.id or 0}:{config.api_key[-12:]}"
 
     @classmethod
-    def _mark_rate_limited(cls, config: GeminiConfig) -> None:
-        cls._cooldowns[cls._cache_key(config)] = monotonic() + cls._cooldown_seconds
+    def _mark_rate_limited(cls, config: GeminiConfig, *, cooldown_seconds: float | None = None) -> None:
+        cooldown_for = max(1.0, float(cooldown_seconds or cls._cooldown_seconds))
+        cls._cooldowns[cls._cache_key(config)] = monotonic() + cooldown_for
 
     @classmethod
     def _clear_cooldown(cls, config: GeminiConfig) -> None:
         cls._cooldowns.pop(cls._cache_key(config), None)
 
-    def _ordered_configs(self) -> list[GeminiConfig]:
+    def _ready_configs(self) -> list[GeminiConfig]:
         now = monotonic()
         ready: list[GeminiConfig] = []
-        cooling: list[tuple[float, GeminiConfig]] = []
 
         for config in self._configs:
             cooldown_until = GeminiClient._cooldowns.get(self._cache_key(config), 0.0)
-            if cooldown_until > now:
-                cooling.append((cooldown_until, config))
-            else:
+            if cooldown_until <= now:
                 ready.append(config)
 
         ready.sort(key=lambda item: (item.sort_order, item.label.lower(), item.id or 0))
-        cooling.sort(key=lambda item: (item[0], item[1].sort_order, item[1].id or 0))
-        return [*ready, *(config for _until, config in cooling)]
+        return ready
+
+    def _next_ready_after_seconds(self) -> float | None:
+        now = monotonic()
+        waits = [
+            max(0.0, cooldown_until - now)
+            for config in self._configs
+            if (cooldown_until := GeminiClient._cooldowns.get(self._cache_key(config), 0.0)) > now
+        ]
+        if not waits:
+            return None
+        return min(waits)
+
+    @classmethod
+    def _warn_all_configs_cooling_down(cls, *, retry_after_seconds: float) -> None:
+        now = monotonic()
+        if now < cls._next_cooldown_warning_at:
+            return
+        cls._next_cooldown_warning_at = now + cls._cooldown_warning_interval_seconds
+        LOGGER.warning(
+            "gemini_all_configs_cooling_down retry_after_seconds=%s",
+            round(retry_after_seconds, 2),
+        )
 
     def _is_rate_limited_response(self, response: httpx.Response) -> bool:
         if response.status_code == 429:
@@ -89,6 +111,27 @@ class GeminiClient:
             )
         )
 
+    def _cooldown_seconds_from_response(self, response: httpx.Response) -> float:
+        retry_after = str(response.headers.get("retry-after") or "").strip()
+        if retry_after:
+            try:
+                return max(1.0, float(retry_after))
+            except ValueError:
+                pass
+
+        body = response.text or ""
+        for pattern in (
+            r"retry after\s+(\d+)",
+            r"in\s+(\d+)\s+seconds",
+        ):
+            match = re.search(pattern, body, re.IGNORECASE)
+            if match:
+                try:
+                    return max(1.0, float(match.group(1)))
+                except ValueError:
+                    continue
+        return float(self._cooldown_seconds)
+
     async def _generate_once(
         self,
         config: GeminiConfig,
@@ -98,7 +141,7 @@ class GeminiClient:
         timeout_seconds: float,
         response_mime_type: str | None,
         max_output_tokens: int | None,
-    ) -> tuple[GeminiResult | None, bool]:
+    ) -> tuple[GeminiResult | None, bool, float | None]:
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{config.model}:generateContent?key={config.api_key}"
@@ -126,14 +169,14 @@ class GeminiClient:
                     config.model,
                     timeout_seconds,
                 )
-                return None, False
+                return None, False, None
             except httpx.ConnectTimeout:
                 LOGGER.warning(
                     "gemini_connect_timeout config_label=%s model=%s",
                     config.label,
                     config.model,
                 )
-                return None, False
+                return None, False, None
             except httpx.TransportError as exc:
                 LOGGER.warning(
                     "gemini_transport_error config_label=%s model=%s detail=%s",
@@ -141,17 +184,19 @@ class GeminiClient:
                     config.model,
                     str(exc),
                 )
-                return None, False
+                return None, False, None
 
         if self._is_rate_limited_response(response):
+            cooldown_seconds = self._cooldown_seconds_from_response(response)
             LOGGER.warning(
-                "gemini_rate_limited config_label=%s model=%s status=%s body=%s",
+                "gemini_rate_limited config_label=%s model=%s status=%s cooldown_seconds=%s body=%s",
                 config.label,
                 config.model,
                 response.status_code,
+                round(cooldown_seconds, 2),
                 (response.text or "").replace("\n", " ")[:400],
             )
-            return None, True
+            return None, True, cooldown_seconds
         if response.status_code in (403, 404):
             LOGGER.warning(
                 "gemini_request_rejected config_label=%s model=%s status=%s body=%s",
@@ -160,7 +205,7 @@ class GeminiClient:
                 response.status_code,
                 (response.text or "").replace("\n", " ")[:400],
             )
-            return None, False
+            return None, False, None
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError:
@@ -171,14 +216,14 @@ class GeminiClient:
                 response.status_code,
                 (response.text or "").replace("\n", " ")[:400],
             )
-            return None, False
+            return None, False, None
 
         try:
             data = response.json()
             text = data["candidates"][0]["content"]["parts"][0]["text"]
             out = (text or "").strip()
             if not out:
-                return None, False
+                return None, False, None
             return (
                 GeminiResult(
                     text=out,
@@ -187,6 +232,7 @@ class GeminiClient:
                     config_label=config.label,
                 ),
                 False,
+                None,
             )
         except Exception as exc:
             LOGGER.warning(
@@ -196,7 +242,7 @@ class GeminiClient:
                 str(exc),
                 (response.text or "").replace("\n", " ")[:400],
             )
-            return None, False
+            return None, False, None
 
     async def generate_text(
         self,
@@ -224,8 +270,15 @@ class GeminiClient:
         response_mime_type: str | None = None,
         max_output_tokens: int | None = None,
     ) -> GeminiResult | None:
-        for config in self._ordered_configs():
-            result, is_rate_limited = await self._generate_once(
+        ready_configs = self._ready_configs()
+        if not ready_configs:
+            retry_after_seconds = self._next_ready_after_seconds()
+            if retry_after_seconds is not None:
+                self._warn_all_configs_cooling_down(retry_after_seconds=retry_after_seconds)
+            return None
+
+        for config in ready_configs:
+            result, is_rate_limited, cooldown_seconds = await self._generate_once(
                 config,
                 parts=parts,
                 temperature=temperature,
@@ -237,7 +290,7 @@ class GeminiClient:
                 GeminiClient._clear_cooldown(config)
                 return result
             if is_rate_limited:
-                GeminiClient._mark_rate_limited(config)
+                GeminiClient._mark_rate_limited(config, cooldown_seconds=cooldown_seconds)
         return None
 
     async def generate_audio_text(

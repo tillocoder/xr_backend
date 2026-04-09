@@ -25,6 +25,34 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
+## Production realtime preset
+
+For a production target around `10,000` concurrent realtime connections on one node, use Redis and the production runner:
+
+```powershell
+$env:XR_REDIS_REQUIRED_FOR_RUNTIME="true"
+$env:XR_BACKEND_EXPECTED_PEAK_WS_CONNECTIONS="10000"
+$env:XR_BACKEND_TARGET_WS_PER_WORKER="2500"
+$env:XR_BACKEND_BACKLOG="8192"
+$env:XR_BACKEND_LIMIT_CONCURRENCY="24000"
+$env:XR_WEBSOCKET_MAX_PENDING_MESSAGES_PER_CONNECTION="32"
+$env:XR_BACKEND_WS_MAX_QUEUE="64"
+.venv\Scripts\python.exe run_prod.py
+```
+
+Or use the ready-made launcher:
+
+```powershell
+.\scripts\start_backend_prod_10k.ps1
+```
+
+Recommended production notes:
+
+- Keep Redis on a low-latency private network and do not run multi-worker realtime without `XR_REDIS_REQUIRED_FOR_RUNTIME=true`.
+- Use a paid Gemini quota or disable Gemini-dependent background paths for production stability.
+- Put the backend behind Nginx or Cloudflare with websocket proxying enabled and a high file-descriptor limit on the host OS.
+- Start with `4` workers for a `10k` websocket target and measure Prometheus websocket metrics before increasing further.
+
 For quick local throwaway runs you can skip Alembic and let FastAPI create tables:
 
 ```powershell

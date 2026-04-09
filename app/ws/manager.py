@@ -258,9 +258,11 @@ class ConnectionManager:
             separators=(",", ":"),
         )
         event_type = str(payload.get("type") or "").strip()
+        topic = str(payload.get("topic") or "").strip()
         outbound_message = OutboundMessage(
             body=serialized_payload,
             event_type=event_type,
+            coalesce_key=self._coalesce_key(event_type=event_type, topic=topic),
         )
 
         for connection_id in targets:
@@ -288,3 +290,12 @@ class ConnectionManager:
     def _refresh_metrics(self) -> None:
         WS_ACTIVE_CONNECTIONS.set(len(self._connections))
         WS_ACTIVE_USERS.set(len(self._user_connections))
+
+    def _coalesce_key(self, *, event_type: str, topic: str) -> str:
+        normalized_event_type = event_type.strip()
+        normalized_topic = topic.strip()
+        if normalized_event_type not in {"chat.presence", "chat.typing"}:
+            return ""
+        if not normalized_topic:
+            return normalized_event_type
+        return f"{normalized_event_type}:{normalized_topic}"

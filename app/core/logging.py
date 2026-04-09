@@ -5,6 +5,14 @@ import logging
 from datetime import datetime, timezone
 
 
+class IgnoreNoisyLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if record.name == "asyncio" and "keepalive ping timeout" in message:
+            return False
+        return True
+
+
 class JsonLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, object] = {
@@ -31,6 +39,7 @@ def configure_logging(level: str = "INFO") -> None:
 
     handler = logging.StreamHandler()
     handler.setFormatter(JsonLogFormatter())
+    handler.addFilter(IgnoreNoisyLogFilter())
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
