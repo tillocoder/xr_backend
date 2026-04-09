@@ -5,6 +5,8 @@ from time import monotonic
 from typing import Sequence
 
 import asyncio
+import base64
+import logging
 import os
 
 import httpx
@@ -18,6 +20,9 @@ class GeminiResult:
     model: str
     config_id: int | None
     config_label: str
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -88,17 +93,24 @@ class GeminiClient:
         self,
         config: GeminiConfig,
         *,
-        prompt: str,
+        parts: list[dict[str, object]],
         temperature: float,
         timeout_seconds: float,
+        response_mime_type: str | None,
+        max_output_tokens: int | None,
     ) -> tuple[GeminiResult | None, bool]:
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{config.model}:generateContent?key={config.api_key}"
         )
+        generation_config: dict[str, object] = {"temperature": temperature}
+        if response_mime_type:
+            generation_config["responseMimeType"] = response_mime_type
+        if max_output_tokens is not None:
+            generation_config["maxOutputTokens"] = max_output_tokens
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature},
+            "contents": [{"parts": parts}],
+            "generationConfig": generation_config,
         }
         timeout = httpx.Timeout(connect=10, read=timeout_seconds, write=20, pool=20)
         limits = httpx.Limits(max_connections=4, max_keepalive_connections=2)
@@ -108,19 +120,57 @@ class GeminiClient:
                 async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
                     response = await client.post(url, json=payload)
             except httpx.ReadTimeout:
+                LOGGER.warning(
+                    "gemini_request_timeout config_label=%s model=%s timeout_seconds=%s",
+                    config.label,
+                    config.model,
+                    timeout_seconds,
+                )
                 return None, False
             except httpx.ConnectTimeout:
+                LOGGER.warning(
+                    "gemini_connect_timeout config_label=%s model=%s",
+                    config.label,
+                    config.model,
+                )
                 return None, False
-            except httpx.TransportError:
+            except httpx.TransportError as exc:
+                LOGGER.warning(
+                    "gemini_transport_error config_label=%s model=%s detail=%s",
+                    config.label,
+                    config.model,
+                    str(exc),
+                )
                 return None, False
 
         if self._is_rate_limited_response(response):
+            LOGGER.warning(
+                "gemini_rate_limited config_label=%s model=%s status=%s body=%s",
+                config.label,
+                config.model,
+                response.status_code,
+                (response.text or "").replace("\n", " ")[:400],
+            )
             return None, True
         if response.status_code in (403, 404):
+            LOGGER.warning(
+                "gemini_request_rejected config_label=%s model=%s status=%s body=%s",
+                config.label,
+                config.model,
+                response.status_code,
+                (response.text or "").replace("\n", " ")[:400],
+            )
             return None, False
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError:
+            LOGGER.warning(
+                "gemini_request_failed config_label=%s model=%s status=%s body=%s",
+                config.label,
+                config.model,
+                response.status_code,
+                (response.text or "").replace("\n", " ")[:400],
+            )
             return None, False
 
         try:
@@ -138,7 +188,14 @@ class GeminiClient:
                 ),
                 False,
             )
-        except Exception:
+        except Exception as exc:
+            LOGGER.warning(
+                "gemini_response_parse_failed config_label=%s model=%s detail=%s body=%s",
+                config.label,
+                config.model,
+                str(exc),
+                (response.text or "").replace("\n", " ")[:400],
+            )
             return None, False
 
     async def generate_text(
@@ -147,13 +204,34 @@ class GeminiClient:
         prompt: str,
         temperature: float = 0.2,
         timeout_seconds: float = 35,
+        response_mime_type: str | None = None,
+        max_output_tokens: int | None = None,
+    ) -> GeminiResult | None:
+        return await self.generate_parts(
+            parts=[{"text": prompt}],
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            response_mime_type=response_mime_type,
+            max_output_tokens=max_output_tokens,
+        )
+
+    async def generate_parts(
+        self,
+        *,
+        parts: list[dict[str, object]],
+        temperature: float = 0.2,
+        timeout_seconds: float = 35,
+        response_mime_type: str | None = None,
+        max_output_tokens: int | None = None,
     ) -> GeminiResult | None:
         for config in self._ordered_configs():
             result, is_rate_limited = await self._generate_once(
                 config,
-                prompt=prompt,
+                parts=parts,
                 temperature=temperature,
                 timeout_seconds=timeout_seconds,
+                response_mime_type=response_mime_type,
+                max_output_tokens=max_output_tokens,
             )
             if result is not None:
                 GeminiClient._clear_cooldown(config)
@@ -162,9 +240,41 @@ class GeminiClient:
                 GeminiClient._mark_rate_limited(config)
         return None
 
+    async def generate_audio_text(
+        self,
+        *,
+        prompt: str,
+        audio_bytes: bytes,
+        mime_type: str,
+        temperature: float = 0.0,
+        timeout_seconds: float = 45,
+        response_mime_type: str | None = None,
+        max_output_tokens: int | None = None,
+    ) -> GeminiResult | None:
+        encoded_audio = base64.b64encode(audio_bytes).decode("ascii")
+        return await self.generate_parts(
+            parts=[
+                {"text": prompt},
+                {"inlineData": {"mimeType": mime_type, "data": encoded_audio}},
+            ],
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            response_mime_type=response_mime_type,
+            max_output_tokens=max_output_tokens,
+        )
 
-async def build_gemini_client(db) -> GeminiClient | None:
-    configs = await list_gemini_configs(db)
+
+async def build_gemini_client(
+    db,
+    *,
+    usage_scope: str = "default",
+    fallback_scopes: tuple[str, ...] = (),
+) -> GeminiClient | None:
+    configs = await list_gemini_configs(
+        db,
+        usage_scope=usage_scope,
+        fallback_scopes=fallback_scopes,
+    )
     if not configs:
         return None
     return GeminiClient(configs)

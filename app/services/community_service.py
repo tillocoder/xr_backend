@@ -4,7 +4,6 @@ import base64
 import binascii
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import case, delete, desc, func, or_, select, update
@@ -56,11 +55,16 @@ from app.services.community_support import (
     normalize_symbols,
     normalize_username,
     profile_score,
-    public_media_url,
 )
 from app.services.daily_reward_service import DailyRewardService
-from app.services.membership_tiers import MEMBERSHIP_TIER_LEGEND, MEMBERSHIP_TIER_PRO
+from app.services.media_storage import MediaStorageService
+from app.services.membership_tiers import (
+    MEMBERSHIP_TIER_FREE,
+    MEMBERSHIP_TIER_LEGEND,
+    MEMBERSHIP_TIER_PRO,
+)
 from app.services.notification_service import NotificationService
+from app.services.rank_theme import coerce_rank_theme_for_membership
 from app.services.user_service import ensure_user_exists
 from app.ws.bus import RedisEventBus
 
@@ -80,8 +84,8 @@ class CommunityService:
         self._bus = bus
         self._cache = cache
         self._daily_rewards = DailyRewardService()
-        self._media_root = Path(__file__).resolve().parents[2] / "media"
         self._public_base_url = (public_base_url or "").strip().rstrip("/")
+        self._media_storage = MediaStorageService(public_base_url=self._public_base_url)
         self._responses = CommunityResponseFactory(
             daily_rewards=self._daily_rewards,
             public_base_url=self._public_base_url,
@@ -750,23 +754,18 @@ class CommunityService:
         category: str,
     ) -> CommunityImageUploadResponse:
         file_name = Path(payload.fileName.strip() or "image.jpg").name
-        suffix = Path(file_name).suffix or ".jpg"
         try:
             raw = base64.b64decode(payload.contentBase64, validate=True)
         except (ValueError, binascii.Error):
             raise self._bad_request("Invalid base64 image payload.")
         if not raw:
             raise self._bad_request("Empty image payload.")
-
-        target_dir = self._media_root / category
-        target_dir.mkdir(parents=True, exist_ok=True)
-        stored_name = f"{uuid4().hex}{suffix.lower()[:8]}"
-        target_path = target_dir / stored_name
-        target_path.write_bytes(raw)
-
-        relative_path = f"/media/{category.strip('/')}/{stored_name}"
-        public_url = public_media_url(relative_path, self._public_base_url) or relative_path
-        return CommunityImageUploadResponse(url=public_url, path=relative_path)
+        stored = await self._media_storage.save_bytes(
+            raw,
+            file_name=file_name,
+            category=category,
+        )
+        return CommunityImageUploadResponse(url=stored.url, path=stored.path)
 
     async def _upsert_profile(
         self,
@@ -801,6 +800,16 @@ class CommunityService:
         profile.username = claimed_username
         profile.display_name = display_name
         profile.avatar_url = normalize_media_reference(payload.avatarUrl)
+        effective_membership_tier = self._daily_rewards.effective_membership_tier_user(
+            user,
+            now=now,
+        )
+        if "rankTheme" in payload.model_fields_set:
+            normalized_rank_theme = coerce_rank_theme_for_membership(
+                value=payload.rankTheme,
+                membership_tier=effective_membership_tier,
+            )
+            profile.rank_theme = None if normalized_rank_theme == "classic" else normalized_rank_theme
         profile.cover_image_url = normalize_media_reference(payload.coverImageUrl)
         profile.biography = normalize_short_text(payload.biography, max_length=160)
         profile.birthday_label = normalize_short_text(payload.birthdayLabel, max_length=24)
@@ -814,11 +823,12 @@ class CommunityService:
                 if item.strip() and item.strip() != user.id
             }
         )
-        profile.is_pro = self._daily_rewards.is_effective_pro_user(user, now=now)
+        profile.is_pro = effective_membership_tier != MEMBERSHIP_TIER_FREE
         profile.updated_at = now
 
         user.display_name = display_name
         user.avatar_url = profile.avatar_url
+        user.rank_theme = profile.rank_theme
         user.username = claimed_username
         user.updated_at = now
         await db.commit()
@@ -961,6 +971,7 @@ class CommunityService:
             "uid": user.id,
             "display_name": display_name,
             "avatar_url": user.avatar_url,
+            "rank_theme": user.rank_theme,
             "cover_image_url": None,
             "biography": "",
             "birthday_label": "",

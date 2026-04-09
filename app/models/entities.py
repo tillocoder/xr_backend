@@ -33,6 +33,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(80))
     avatar_url: Mapped[str | None] = mapped_column(String(512))
+    rank_theme: Mapped[str | None] = mapped_column(String(24))
     membership_tier: Mapped[str] = mapped_column(String(16), default="free", nullable=False)
     is_pro: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     paid_membership_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -60,6 +61,7 @@ class CommunityProfile(Base):
     username: Mapped[str] = mapped_column(String(24), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(32))
     avatar_url: Mapped[str | None] = mapped_column(String(512))
+    rank_theme: Mapped[str | None] = mapped_column(String(24))
     cover_image_url: Mapped[str | None] = mapped_column(String(512))
     biography: Mapped[str] = mapped_column(String(160), default="", nullable=False)
     birthday_label: Mapped[str] = mapped_column(String(24), default="", nullable=False)
@@ -92,6 +94,7 @@ class LearningVideoLesson(Base):
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    publisher_uid: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(140))
     summary: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     video_url: Mapped[str] = mapped_column(String(1024))
@@ -107,6 +110,21 @@ class LearningVideoLesson(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class LearningVideoComment(Base):
+    __tablename__ = "learning_video_comments"
+    __table_args__ = (
+        Index("ix_learning_video_comments_lesson_created_at", "lesson_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey("learning_video_lessons.id"), index=True)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    content: Mapped[str] = mapped_column(String(600), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 
@@ -338,9 +356,18 @@ class AuthSession(Base):
 
 class AiProviderConfig(Base):
     __tablename__ = "ai_provider_configs"
+    __table_args__ = (
+        Index(
+            "ix_ai_provider_configs_provider_usage_scope_sort_order",
+            "provider",
+            "usage_scope",
+            "sort_order",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(24), default="gemini", nullable=False)
+    usage_scope: Mapped[str] = mapped_column(String(24), default="default", nullable=False)
     label: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     api_key: Mapped[str | None] = mapped_column(String(512))
     model: Mapped[str] = mapped_column(String(64), default="gemini-3-flash-preview", nullable=False)

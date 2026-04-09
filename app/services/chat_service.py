@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import json
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy import and_, delete, desc, func, or_, select, update
@@ -16,12 +15,13 @@ from app.schemas.feed import FeedAuthor
 from app.schemas.ws import WsEnvelope
 from app.services.cache import RedisCache
 from app.services.daily_reward_service import DailyRewardService
+from app.services.media_storage import MediaStorageService
 from app.services.notification_service import NotificationService
 from app.services.user_service import ensure_user_exists
 from app.ws.bus import RedisEventBus
 
-_MEDIA_ROOT = Path(__file__).resolve().parents[2] / "media"
 _daily_rewards = DailyRewardService()
+_media_storage = MediaStorageService()
 
 
 def _encode_cursor(created_at: datetime, message_id: str) -> str:
@@ -725,7 +725,7 @@ async def delete_direct_chat_for_user(
     await db.commit()
 
     for media_url in media_urls:
-        _delete_chat_media_file(media_url)
+        await _media_storage.delete(media_url)
 
     await bus.publish(
         f"room:{chat_id}",
@@ -1047,22 +1047,3 @@ def _normalize_message_type(
     if media_url:
         return "voice" if media_duration_ms > 0 else "image"
     return "text"
-
-
-def _delete_chat_media_file(raw_media_url: str) -> None:
-    media_url = _normalize_message_media_url(raw_media_url)
-    if media_url is None or not media_url.startswith("/media/"):
-        return
-    relative = media_url.removeprefix("/media/").strip("/")
-    if not relative:
-        return
-    target_path = (_MEDIA_ROOT / relative).resolve()
-    try:
-        target_path.relative_to(_MEDIA_ROOT.resolve())
-    except ValueError:
-        return
-    try:
-        if target_path.exists() and target_path.is_file():
-            target_path.unlink()
-    except OSError:
-        return

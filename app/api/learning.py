@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import CurrentUser, get_current_user
 from app.core.config import get_settings
 from app.core.public_url import get_public_base_url_for_request
 from app.db.session import get_db
@@ -15,7 +16,11 @@ from app.presentation.api.json_cache import JsonRouteCache
 from app.presentation.api.request_state import get_notification_service
 from app.schemas.learning import (
     AdminLearningVideoLessonResponse,
+    LearningVideoAddCommentRequest,
+    LearningVideoCommentResponse,
     LearningVideoLessonResponse,
+    LearningVideoPublishingStatusResponse,
+    LearningVideoSelfPublishRequest,
     LearningVideoUploadResponse,
     LearningVideoLessonUpsertRequest,
 )
@@ -27,7 +32,7 @@ admin_router = APIRouter(prefix="/admin/learning", tags=["admin-learning"])
 _security = HTTPBasic()
 _learning_service = LearningService()
 _PUBLIC_LEARNING_VIDEO_CACHE = JsonRouteCache(
-    namespace="learning:videos:v1",
+    namespace="learning:videos:v2",
     ttl_setting_name="learning_public_cache_ttl_seconds",
     default_ttl_seconds=75,
     min_ttl_seconds=20,
@@ -56,6 +61,13 @@ def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> st
     )
 
 
+async def _invalidate_public_learning_cache(request: Request) -> None:
+    await _PUBLIC_LEARNING_VIDEO_CACHE.delete_prefix(
+        request,
+        _PUBLIC_LEARNING_VIDEO_CACHE.build_key("published"),
+    )
+
+
 @router.get("/videos", response_model=list[LearningVideoLessonResponse])
 async def get_learning_videos(
     request: Request,
@@ -68,6 +80,84 @@ async def get_learning_videos(
     payload = await _learning_service.list_published_video_lessons(db)
     await _PUBLIC_LEARNING_VIDEO_CACHE.set(request, cache_key, payload)
     return payload
+
+
+@router.get("/videos/publishing-status", response_model=LearningVideoPublishingStatusResponse)
+async def get_learning_video_publishing_status(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LearningVideoPublishingStatusResponse:
+    return await _learning_service.get_publishing_status(db, user_id=user.id)
+
+
+@router.post(
+    "/videos",
+    response_model=LearningVideoLessonResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_learning_video_for_user(
+    request: Request,
+    payload: LearningVideoSelfPublishRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LearningVideoLessonResponse:
+    lesson = await _learning_service.create_video_lesson_for_user(
+        db,
+        user_id=user.id,
+        payload=payload,
+    )
+    await _invalidate_public_learning_cache(request)
+    return lesson
+
+
+@router.delete(
+    "/videos/{lesson_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def delete_learning_video_for_user(
+    lesson_id: str,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    await _learning_service.delete_video_lesson_for_user(
+        db,
+        user_id=user.id,
+        lesson_id=lesson_id,
+    )
+    await _invalidate_public_learning_cache(request)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/videos/{lesson_id}/comments",
+    response_model=list[LearningVideoCommentResponse],
+)
+async def get_learning_video_comments(
+    lesson_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[LearningVideoCommentResponse]:
+    return await _learning_service.list_video_comments(db, lesson_id=lesson_id)
+
+
+@router.post(
+    "/videos/{lesson_id}/comments",
+    response_model=LearningVideoCommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_learning_video_comment(
+    lesson_id: str,
+    payload: LearningVideoAddCommentRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LearningVideoCommentResponse:
+    return await _learning_service.add_video_comment(
+        db,
+        lesson_id=lesson_id,
+        user_id=user.id,
+        payload=payload,
+    )
 
 
 @admin_router.get("", response_class=HTMLResponse)
@@ -100,6 +190,7 @@ async def create_learning_video(
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
     lesson = await _learning_service.create_video_lesson(db, payload)
+    await _invalidate_public_learning_cache(request)
     _queue_learning_video_notification(request, lesson)
     return lesson
 
@@ -107,11 +198,14 @@ async def create_learning_video(
 @admin_router.put("/videos/{lesson_id}", response_model=AdminLearningVideoLessonResponse)
 async def update_learning_video(
     lesson_id: str,
+    request: Request,
     payload: LearningVideoLessonUpsertRequest,
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
-    return await _learning_service.update_video_lesson(db, lesson_id, payload)
+    lesson = await _learning_service.update_video_lesson(db, lesson_id, payload)
+    await _invalidate_public_learning_cache(request)
+    return lesson
 
 
 @admin_router.post("/upload-video", response_model=LearningVideoUploadResponse)
@@ -130,6 +224,7 @@ async def publish_learning_video(
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
     lesson = await _learning_service.set_published(db, lesson_id, value=True)
+    await _invalidate_public_learning_cache(request)
     _queue_learning_video_notification(request, lesson)
     return lesson
 
@@ -137,37 +232,48 @@ async def publish_learning_video(
 @admin_router.post("/videos/{lesson_id}/unpublish", response_model=AdminLearningVideoLessonResponse)
 async def unpublish_learning_video(
     lesson_id: str,
+    request: Request,
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
-    return await _learning_service.set_published(db, lesson_id, value=False)
+    lesson = await _learning_service.set_published(db, lesson_id, value=False)
+    await _invalidate_public_learning_cache(request)
+    return lesson
 
 
 @admin_router.post("/videos/{lesson_id}/feature", response_model=AdminLearningVideoLessonResponse)
 async def feature_learning_video(
     lesson_id: str,
+    request: Request,
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
-    return await _learning_service.set_featured(db, lesson_id, value=True)
+    lesson = await _learning_service.set_featured(db, lesson_id, value=True)
+    await _invalidate_public_learning_cache(request)
+    return lesson
 
 
 @admin_router.post("/videos/{lesson_id}/unfeature", response_model=AdminLearningVideoLessonResponse)
 async def unfeature_learning_video(
     lesson_id: str,
+    request: Request,
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminLearningVideoLessonResponse:
-    return await _learning_service.set_featured(db, lesson_id, value=False)
+    lesson = await _learning_service.set_featured(db, lesson_id, value=False)
+    await _invalidate_public_learning_cache(request)
+    return lesson
 
 
 @admin_router.delete("/videos/{lesson_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def delete_learning_video(
     lesson_id: str,
+    request: Request,
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     await _learning_service.delete_video_lesson(db, lesson_id)
+    await _invalidate_public_learning_cache(request)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -28,11 +28,15 @@ from app.models.entities import (
 )
 from app.presentation.api.request_state import get_auth_session_service
 from app.schemas.admin_dashboard import AdminOverviewResponse, AdminStatsResponse
+from app.services.daily_reward_service import DailyRewardService
+from app.services.rank_theme import coerce_rank_theme_for_membership
 from app.services.ai_provider_config_service import (
     DEFAULT_GEMINI_MODEL,
+    GEMINI_SCOPE_DEFAULT,
     MAX_GEMINI_API_KEYS,
     count_gemini_config_rows,
     mask_api_key,
+    normalize_gemini_usage_scope,
     place_gemini_config,
     rebalance_gemini_config_rows,
 )
@@ -43,6 +47,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 _security = HTTPBasic()
 _admin_dashboard_service = AdminDashboardService()
+_daily_rewards = DailyRewardService()
 
 
 def _require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> str:
@@ -72,6 +77,7 @@ class AdminUserItem(BaseModel):
     display_name: str
     membership_tier: str
     is_pro: bool
+    rank_theme: str | None = None
     diamonds_balance: int
     daily_reward_streak: int
     created_at: datetime
@@ -88,6 +94,7 @@ class AdminUserPatch(BaseModel):
     display_name: str | None = None
     membership_tier: str | None = None
     is_pro: bool | None = None
+    rank_theme: str | None = None
     diamonds_balance: int | None = None
     daily_reward_streak: int | None = None
 
@@ -128,6 +135,7 @@ class AdminIssuedUserSessionResponse(BaseModel):
 
 
 class AiProviderConfigCreate(BaseModel):
+    usage_scope: str = GEMINI_SCOPE_DEFAULT
     label: str | None = None
     api_key: str
     model: str = DEFAULT_GEMINI_MODEL
@@ -136,6 +144,7 @@ class AiProviderConfigCreate(BaseModel):
 
 
 class AiProviderConfigPatch(BaseModel):
+    usage_scope: str | None = None
     label: str | None = None
     api_key: str | None = None
     model: str | None = None
@@ -146,6 +155,7 @@ class AiProviderConfigPatch(BaseModel):
 class AiProviderConfigOut(BaseModel):
     id: int
     provider: str
+    usage_scope: str
     label: str
     model: str
     sort_order: int
@@ -308,6 +318,7 @@ async def list_admin_users(
             User.display_name,
             User.membership_tier,
             User.is_pro,
+            User.rank_theme,
             User.diamonds_balance,
             User.daily_reward_streak,
             User.created_at,
@@ -329,6 +340,7 @@ async def list_admin_users(
             display_name=row.display_name,
             membership_tier=row.membership_tier,
             is_pro=bool(row.is_pro),
+            rank_theme=(row.rank_theme or "").strip() or None,
             diamonds_balance=int(row.diamonds_balance or 0),
             daily_reward_streak=int(row.daily_reward_streak or 0),
             created_at=row.created_at,
@@ -357,6 +369,15 @@ async def update_admin_user(
         user.membership_tier = payload.membership_tier.strip().lower() or user.membership_tier
     if payload.is_pro is not None:
         user.is_pro = bool(payload.is_pro)
+    if payload.rank_theme is not None:
+        effective_membership_tier = _daily_rewards.effective_membership_tier_user(
+            user,
+        )
+        normalized_rank_theme = coerce_rank_theme_for_membership(
+            value=payload.rank_theme,
+            membership_tier=effective_membership_tier,
+        )
+        user.rank_theme = None if normalized_rank_theme == "classic" else normalized_rank_theme
     if payload.diamonds_balance is not None:
         user.diamonds_balance = int(payload.diamonds_balance)
     if payload.daily_reward_streak is not None:
@@ -384,6 +405,7 @@ async def update_admin_user(
         display_name=user.display_name,
         membership_tier=user.membership_tier,
         is_pro=bool(user.is_pro),
+        rank_theme=(user.rank_theme or "").strip() or None,
         diamonds_balance=int(user.diamonds_balance or 0),
         daily_reward_streak=int(user.daily_reward_streak or 0),
         created_at=user.created_at,
@@ -699,6 +721,7 @@ def _serialize_ai_provider_config(cfg: AiProviderConfig) -> AiProviderConfigOut:
     return AiProviderConfigOut(
         id=cfg.id,
         provider=cfg.provider,
+        usage_scope=normalize_gemini_usage_scope(cfg.usage_scope),
         label=(cfg.label or "").strip(),
         model=cfg.model,
         sort_order=max(1, int(cfg.sort_order or 1)),
@@ -718,7 +741,11 @@ async def list_ai_provider_configs(
         await db.scalars(
             select(AiProviderConfig)
             .where(AiProviderConfig.provider == "gemini")
-            .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.updated_at.desc())
+            .order_by(
+                AiProviderConfig.usage_scope.asc(),
+                AiProviderConfig.sort_order.asc(),
+                AiProviderConfig.updated_at.desc(),
+            )
         )
     ).all()
     return [_serialize_ai_provider_config(i) for i in items]
@@ -734,10 +761,11 @@ async def create_ai_provider_config(
     _: str = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AiProviderConfigOut:
-    if await count_gemini_config_rows(db) >= MAX_GEMINI_API_KEYS:
+    usage_scope = normalize_gemini_usage_scope(payload.usage_scope)
+    if await count_gemini_config_rows(db, usage_scope=usage_scope) >= MAX_GEMINI_API_KEYS:
         raise HTTPException(
             status_code=400,
-            detail=f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys.",
+            detail=f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys per usage.",
         )
 
     api_key = payload.api_key.strip()
@@ -746,6 +774,7 @@ async def create_ai_provider_config(
 
     cfg = AiProviderConfig(
         provider="gemini",
+        usage_scope=usage_scope,
         label=(payload.label or "").strip(),
         api_key=api_key,
         model=(payload.model or "").strip() or DEFAULT_GEMINI_MODEL,
@@ -770,6 +799,25 @@ async def update_ai_provider_config(
     if cfg is None or cfg.provider != "gemini":
         raise HTTPException(status_code=404, detail="Config not found.")
 
+    previous_scope = normalize_gemini_usage_scope(cfg.usage_scope)
+    next_scope = previous_scope
+    if payload.usage_scope is not None:
+        next_scope = normalize_gemini_usage_scope(payload.usage_scope)
+    if (
+        next_scope != previous_scope
+        and await count_gemini_config_rows(
+            db,
+            usage_scope=next_scope,
+            exclude_id=cfg.id,
+        )
+        >= MAX_GEMINI_API_KEYS
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys per usage.",
+        )
+
+    cfg.usage_scope = next_scope
     if payload.label is not None:
         cfg.label = payload.label.strip()
     if payload.api_key is not None:
@@ -782,6 +830,8 @@ async def update_ai_provider_config(
         cfg.sort_order = int(payload.sort_order)
 
     await place_gemini_config(db, cfg, desired_order=cfg.sort_order)
+    if previous_scope != cfg.usage_scope:
+        await rebalance_gemini_config_rows(db, usage_scope=previous_scope)
     await db.commit()
     await db.refresh(cfg)
     return _serialize_ai_provider_config(cfg)
@@ -801,8 +851,9 @@ async def delete_ai_provider_config(
     if cfg is None or cfg.provider != "gemini":
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+    previous_scope = normalize_gemini_usage_scope(cfg.usage_scope)
     await db.delete(cfg)
     await db.flush()
-    await rebalance_gemini_config_rows(db)
+    await rebalance_gemini_config_rows(db, usage_scope=previous_scope)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

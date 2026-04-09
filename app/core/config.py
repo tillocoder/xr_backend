@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     news_related_cache_ttl_seconds: int = 300
     news_revision_cache_ttl_seconds: int = 30
     cryptopanic_api_token: str = ""
+    gemini_api_key: str = ""
+    gemini_api_key_portfolio: str = ""
+    gemini_model: str = ""
+    gemini_model_portfolio: str = ""
     ws_heartbeat_seconds: int = 25
     auto_create_schema: bool = False
     public_base_url: str = ""
@@ -89,6 +93,13 @@ class Settings(BaseSettings):
     market_cache_ttl_seconds: int = 75
     market_tracked_limit: int = 20
     community_public_cache_ttl_seconds: int = 45
+    r2_endpoint_url: str = ""
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = ""
+    r2_public_base_url: str = ""
+    r2_region: str = "auto"
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:

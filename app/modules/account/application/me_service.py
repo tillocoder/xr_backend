@@ -9,9 +9,11 @@ from app.schemas.me import (
     DailyRewardStatusResponse,
     MeBootstrapPayload,
     MembershipCatalogResponse,
+    PortfolioVoiceCommandResponse,
 )
 from app.services.daily_reward_service import DailyRewardService, DailyRewardStatus
 from app.services.membership_catalog_service import MembershipCatalogService
+from app.services.portfolio_voice_command_service import PortfolioVoiceCommandService
 from app.services.user_service import ensure_user_exists
 
 
@@ -20,9 +22,13 @@ class MeService:
         self,
         daily_reward_service: DailyRewardService | None = None,
         membership_catalog_service: MembershipCatalogService | None = None,
+        portfolio_voice_command_service: PortfolioVoiceCommandService | None = None,
     ) -> None:
         self._daily_reward_service = daily_reward_service or DailyRewardService()
         self._membership_catalog = membership_catalog_service or MembershipCatalogService()
+        self._portfolio_voice_command_service = (
+            portfolio_voice_command_service or PortfolioVoiceCommandService()
+        )
 
     async def get_bootstrap(
         self,
@@ -138,6 +144,44 @@ class MeService:
         if changed or created:
             await db.commit()
         return {"ok": True, "changed": changed}
+
+    async def process_portfolio_voice_command(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: str,
+        transcript: str,
+        app_language_code: str,
+        speech_locale_id: str | None = None,
+    ) -> PortfolioVoiceCommandResponse:
+        del user_id
+        return await self._portfolio_voice_command_service.interpret_transcript(
+            db,
+            transcript=transcript,
+            app_language_code=app_language_code,
+            speech_locale_id=speech_locale_id,
+        )
+
+    async def process_portfolio_voice_audio(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: str,
+        audio_bytes: bytes,
+        mime_type: str | None,
+        filename: str | None,
+        app_language_code: str,
+        speech_locale_id: str | None = None,
+    ) -> PortfolioVoiceCommandResponse:
+        del user_id
+        return await self._portfolio_voice_command_service.interpret_audio(
+            db,
+            audio_bytes=audio_bytes,
+            mime_type=mime_type,
+            filename=filename,
+            app_language_code=app_language_code,
+            speech_locale_id=speech_locale_id,
+        )
 
     async def _get_or_create_user(self, db: AsyncSession, user_id: str) -> tuple[User, bool]:
         user = await db.get(User, user_id)

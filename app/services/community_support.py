@@ -14,6 +14,7 @@ from app.schemas.community import (
 )
 from app.services.daily_reward_service import DailyRewardService
 from app.services.membership_tiers import MEMBERSHIP_TIER_LEGEND, MEMBERSHIP_TIER_PRO
+from app.services.rank_theme import resolve_rank_theme
 
 
 REACTION_KEY_BY_CODE = {
@@ -310,6 +311,11 @@ class CommunityResponseFactory:
             uid=user.id,
         )
         effective_tier = self._daily_rewards.effective_membership_tier_user(user)
+        rank_theme = resolve_rank_theme(
+            user_rank_theme=user.rank_theme,
+            profile_rank_theme=profile.rank_theme if profile is not None else None,
+            membership_tier=effective_tier,
+        )
         return CommunityProfileResponse(
             uid=user.id,
             displayName=profile_display_name
@@ -368,6 +374,7 @@ class CommunityResponseFactory:
             ),
             membershipTier=effective_tier,
             isPro=effective_tier != "free",
+            rankTheme=rank_theme,
         )
 
     def post_response(
@@ -380,6 +387,11 @@ class CommunityResponseFactory:
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
         author_membership_tier = self._daily_rewards.effective_membership_tier_user(user)
+        author_rank_theme = resolve_rank_theme(
+            user_rank_theme=user.rank_theme,
+            profile_rank_theme=profile.rank_theme if profile is not None else None,
+            membership_tier=author_membership_tier,
+        )
         profile_username = normalize_username(profile.username) if profile is not None else ""
         author_name = (
             normalize_display_name(profile.display_name)
@@ -415,6 +427,7 @@ class CommunityResponseFactory:
             ),
             authorMembershipTier=author_membership_tier,
             authorIsPro=author_membership_tier != "free",
+            authorRankTheme=author_rank_theme,
             content=normalize_short_text(post.content, max_length=2000),
             symbol=symbol,
             symbols=symbols,
@@ -441,6 +454,12 @@ class CommunityResponseFactory:
             if profile is not None
             else normalize_display_name(user.display_name)
         ) or "XR HODL Member"
+        author_membership_tier = self._daily_rewards.effective_membership_tier_user(user)
+        author_rank_theme = resolve_rank_theme(
+            user_rank_theme=user.rank_theme,
+            profile_rank_theme=profile.rank_theme if profile is not None else None,
+            membership_tier=author_membership_tier,
+        )
         username = (
             normalize_username(profile.username)
             if profile is not None
@@ -456,6 +475,9 @@ class CommunityResponseFactory:
                 profile.avatar_url if profile is not None and profile.avatar_url else user.avatar_url,
                 self._public_base_url,
             ),
+            authorMembershipTier=author_membership_tier,
+            authorIsPro=author_membership_tier != "free",
+            authorRankTheme=author_rank_theme,
             replyToCommentId=nullable_text(comment.reply_to_comment_id),
             replyToAuthorUsername=nullable_text(comment.reply_to_author_username),
             content=normalize_short_text(comment.content, max_length=1000),

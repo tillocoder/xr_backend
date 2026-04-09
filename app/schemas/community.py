@@ -36,6 +36,7 @@ class CommunityProfileResponse(BaseModel):
     displayNameChangeCount: int = 0
     membershipTier: str = "free"
     isPro: bool = False
+    rankTheme: str = "classic"
 
 
 class CommunityPostResponse(BaseModel):
@@ -46,6 +47,7 @@ class CommunityPostResponse(BaseModel):
     authorAvatarUrl: str | None = None
     authorMembershipTier: str = "free"
     authorIsPro: bool = False
+    authorRankTheme: str = "classic"
     content: str
     symbol: str | None = None
     symbols: list[str] = Field(default_factory=list)
@@ -65,6 +67,9 @@ class CommunityCommentResponse(BaseModel):
     authorName: str
     authorUsername: str
     authorAvatarUrl: str | None = None
+    authorMembershipTier: str = "free"
+    authorIsPro: bool = False
+    authorRankTheme: str = "classic"
     replyToCommentId: str | None = None
     replyToAuthorUsername: str | None = None
     content: str
@@ -76,6 +81,7 @@ class CommunityProfileUpsertRequest(BaseModel):
     displayName: str
     username: str
     avatarUrl: str | None = None
+    rankTheme: str | None = None
     coverImageUrl: str | None = None
     biography: str = ""
     birthdayLabel: str = ""

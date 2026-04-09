@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from sqlalchemy import create_engine, delete, func, select, update
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
+from sqladmin.fields import SelectField
 from starlette.requests import Request
 
 from app.core.config import get_settings
@@ -34,8 +35,11 @@ from app.models.entities import (
 )
 from app.services.ai_provider_config_service import (
     DEFAULT_GEMINI_MODEL,
+    GEMINI_SCOPE_DEFAULT,
+    GEMINI_SCOPE_PORTFOLIO,
     MAX_GEMINI_API_KEYS,
     mask_api_key,
+    normalize_gemini_usage_scope,
 )
 
 
@@ -421,6 +425,7 @@ class AiProviderConfigAdmin(ModelView, model=AiProviderConfig):
     name_plural = "Gemini API Keys"
     column_list = [
         AiProviderConfig.id,
+        AiProviderConfig.usage_scope,
         AiProviderConfig.label,
         AiProviderConfig.sort_order,
         AiProviderConfig.api_key,
@@ -429,6 +434,7 @@ class AiProviderConfigAdmin(ModelView, model=AiProviderConfig):
         AiProviderConfig.updated_at,
     ]
     column_labels = {
+        AiProviderConfig.usage_scope: "Usage",
         AiProviderConfig.label: "Label",
         AiProviderConfig.sort_order: "Priority",
         AiProviderConfig.api_key: "API Key",
@@ -439,17 +445,41 @@ class AiProviderConfigAdmin(ModelView, model=AiProviderConfig):
     column_formatters = {
         AiProviderConfig.api_key: lambda m, a: mask_api_key(m.api_key),
     }
-    column_searchable_list = [AiProviderConfig.label, AiProviderConfig.model]
-    column_default_sort = [(AiProviderConfig.sort_order, False), (AiProviderConfig.updated_at, True)]
+    column_searchable_list = [
+        AiProviderConfig.usage_scope,
+        AiProviderConfig.label,
+        AiProviderConfig.model,
+    ]
+    column_default_sort = [
+        (AiProviderConfig.usage_scope, False),
+        (AiProviderConfig.sort_order, False),
+        (AiProviderConfig.updated_at, True),
+    ]
     form_columns = [
+        AiProviderConfig.usage_scope,
         AiProviderConfig.label,
         AiProviderConfig.api_key,
         AiProviderConfig.model,
         AiProviderConfig.sort_order,
         AiProviderConfig.enabled,
     ]
+    form_overrides = {
+        "usage_scope": SelectField,
+    }
+    form_args = {
+        "usage_scope": {
+            "choices": [
+                (GEMINI_SCOPE_DEFAULT, "Default"),
+                (GEMINI_SCOPE_PORTFOLIO, "Portfolio"),
+            ],
+        },
+    }
 
     async def on_model_change(self, data, model, is_created: bool, request: Request) -> None:
+        usage_scope = normalize_gemini_usage_scope(
+            data.get("usage_scope") or getattr(model, "usage_scope", GEMINI_SCOPE_DEFAULT)
+        )
+        data["usage_scope"] = usage_scope
         data["provider"] = "gemini"
         data["model"] = str(data.get("model") or model.model or DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
         data["sort_order"] = max(1, min(int(data.get("sort_order") or model.sort_order or 1), MAX_GEMINI_API_KEYS))
@@ -459,53 +489,92 @@ class AiProviderConfigAdmin(ModelView, model=AiProviderConfig):
         if is_created and not api_key:
             raise ValueError("API key is required.")
 
+        previous_scope = usage_scope
+        if not is_created and getattr(model, "id", None):
+            with self.session_maker(expire_on_commit=False) as session:
+                existing = session.get(AiProviderConfig, int(model.id))
+                if existing is not None:
+                    previous_scope = normalize_gemini_usage_scope(existing.usage_scope)
+        request.state.ai_provider_previous_usage_scope = previous_scope
+
         if is_created:
             with self.session_maker(expire_on_commit=False) as session:
-                total = int(
-                    session.execute(
-                        select(func.count(AiProviderConfig.id)).where(AiProviderConfig.provider == "gemini")
-                    ).scalar()
-                    or 0
-                )
+                total = self._count_scope_rows_sync(session, usage_scope=usage_scope)
                 if total >= MAX_GEMINI_API_KEYS:
-                    raise ValueError(f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys.")
+                    raise ValueError(
+                        f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys per usage."
+                    )
+            return
+
+        with self.session_maker(expire_on_commit=False) as session:
+            total = self._count_scope_rows_sync(
+                session,
+                usage_scope=usage_scope,
+                exclude_id=int(model.id),
+            )
+            if total >= MAX_GEMINI_API_KEYS:
+                raise ValueError(
+                    f"You can store up to {MAX_GEMINI_API_KEYS} Gemini API keys per usage."
+                )
 
     async def after_model_change(self, data, model, is_created: bool, request: Request) -> None:
         with self.session_maker(expire_on_commit=False) as session:
             current = session.get(AiProviderConfig, int(model.id))
             if current is None:
                 return
-
-            rows = list(
-                session.execute(
-                    select(AiProviderConfig)
-                    .where(AiProviderConfig.provider == "gemini")
-                    .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.id.asc())
-                ).scalars().all()
+            current_scope = normalize_gemini_usage_scope(current.usage_scope)
+            previous_scope = normalize_gemini_usage_scope(
+                getattr(request.state, "ai_provider_previous_usage_scope", current_scope)
             )
-            rows = [row for row in rows if row.id != current.id]
-            target = max(1, min(int(current.sort_order or 1), len(rows) + 1))
-            rows.insert(target - 1, current)
-
-            for index, row in enumerate(rows, start=1):
-                row.sort_order = index
-                row.label = str(row.label or "").strip() or f"Gemini Key {index}"
-
+            self._place_scope_row_sync(session, current)
+            if previous_scope != current_scope:
+                self._rebalance_scope_rows_sync(session, previous_scope)
             session.commit()
 
     async def after_model_delete(self, model, request: Request) -> None:
         with self.session_maker(expire_on_commit=False) as session:
-            rows = list(
-                session.execute(
-                    select(AiProviderConfig)
-                    .where(AiProviderConfig.provider == "gemini")
-                    .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.id.asc())
-                ).scalars().all()
+            self._rebalance_scope_rows_sync(
+                session,
+                normalize_gemini_usage_scope(getattr(model, "usage_scope", GEMINI_SCOPE_DEFAULT)),
             )
-            for index, row in enumerate(rows, start=1):
-                row.sort_order = index
-                row.label = str(row.label or "").strip() or f"Gemini Key {index}"
             session.commit()
+
+    def _count_scope_rows_sync(self, session, *, usage_scope: str, exclude_id: int | None = None) -> int:
+        stmt = select(func.count(AiProviderConfig.id)).where(
+            AiProviderConfig.provider == "gemini",
+            AiProviderConfig.usage_scope == usage_scope,
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(AiProviderConfig.id != int(exclude_id))
+        return int(session.execute(stmt).scalar() or 0)
+
+    def _scope_rows_sync(self, session, usage_scope: str) -> list[AiProviderConfig]:
+        return list(
+            session.execute(
+                select(AiProviderConfig)
+                .where(
+                    AiProviderConfig.provider == "gemini",
+                    AiProviderConfig.usage_scope == usage_scope,
+                )
+                .order_by(AiProviderConfig.sort_order.asc(), AiProviderConfig.id.asc())
+            ).scalars().all()
+        )
+
+    def _place_scope_row_sync(self, session, row: AiProviderConfig) -> None:
+        usage_scope = normalize_gemini_usage_scope(row.usage_scope)
+        row.usage_scope = usage_scope
+        rows = [item for item in self._scope_rows_sync(session, usage_scope) if item.id != row.id]
+        target = max(1, min(int(row.sort_order or 1), len(rows) + 1))
+        rows.insert(target - 1, row)
+        for index, item in enumerate(rows, start=1):
+            item.sort_order = index
+            item.label = str(item.label or "").strip() or f"Gemini Key {index}"
+
+    def _rebalance_scope_rows_sync(self, session, usage_scope: str) -> None:
+        rows = self._scope_rows_sync(session, usage_scope)
+        for index, row in enumerate(rows, start=1):
+            row.sort_order = index
+            row.label = str(row.label or "").strip() or f"Gemini Key {index}"
 
 
 class NewsArticleAdmin(ModelView, model=NewsArticle):

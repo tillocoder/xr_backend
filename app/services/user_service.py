@@ -28,6 +28,7 @@ async def ensure_user_exists(
         username=_fallback_username(normalized_user_id),
         display_name=(display_name or "XR HODL Member").strip() or "XR HODL Member",
         avatar_url=(avatar_url or "").strip() or None,
+        rank_theme=None,
         membership_tier=MEMBERSHIP_TIER_PRO if bool(is_pro) else MEMBERSHIP_TIER_FREE,
         is_pro=bool(is_pro),
         watchlist_json=[],

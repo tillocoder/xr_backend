@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_current_user
@@ -16,6 +17,8 @@ from app.schemas.me import (
     DailyRewardStatusResponse,
     MeBootstrapPayload,
     MeHoldingsPayload,
+    PortfolioVoiceCommandRequest,
+    PortfolioVoiceCommandResponse,
     MembershipCatalogResponse,
     MeWalletsPayload,
     MeWatchlistPayload,
@@ -25,10 +28,16 @@ from app.schemas.notification import (
     NotificationListResponse,
     PushTokenPayload,
 )
+from app.services.portfolio_voice_command_service import (
+    PortfolioVoiceInterpretationError,
+    PortfolioVoiceNotConfiguredError,
+    PortfolioVoiceUnavailableError,
+)
 
 
 router = APIRouter(prefix="/me", tags=["me"])
 _ME_SERVICE = MeService()
+LOGGER = logging.getLogger(__name__)
 
 
 @router.get("/bootstrap")
@@ -122,6 +131,109 @@ async def update_bootstrap(
         user_id=current_user.id,
         payload=payload,
     )
+
+
+@router.post("/portfolio/voice-command", response_model=PortfolioVoiceCommandResponse)
+async def process_portfolio_voice_command(
+    payload: PortfolioVoiceCommandRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PortfolioVoiceCommandResponse:
+    try:
+        return await _ME_SERVICE.process_portfolio_voice_command(
+            db,
+            user_id=current_user.id,
+            transcript=payload.transcript,
+            app_language_code=payload.appLanguageCode,
+            speech_locale_id=payload.speechLocaleId,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PortfolioVoiceNotConfiguredError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_not_configured detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+        )
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PortfolioVoiceUnavailableError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_unavailable detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+        )
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PortfolioVoiceInterpretationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/portfolio/voice-command/audio", response_model=PortfolioVoiceCommandResponse)
+async def process_portfolio_voice_audio(
+    app_language_code: str = Form("en"),
+    speech_locale_id: str | None = Form(None),
+    audio: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PortfolioVoiceCommandResponse:
+    try:
+        audio_bytes = await audio.read()
+        return await _ME_SERVICE.process_portfolio_voice_audio(
+            db,
+            user_id=current_user.id,
+            audio_bytes=audio_bytes,
+            mime_type=audio.content_type,
+            filename=audio.filename,
+            app_language_code=app_language_code,
+            speech_locale_id=speech_locale_id,
+        )
+    except ValueError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_bad_request detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+            extra={
+                "user_id": current_user.id,
+                "app_language_code": app_language_code,
+                "speech_locale_id": speech_locale_id,
+                "audio_filename": audio.filename,
+                "audio_mime_type": audio.content_type,
+                "audio_size_bytes": len(audio_bytes) if "audio_bytes" in locals() else 0,
+                "detail": str(exc),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PortfolioVoiceNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PortfolioVoiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PortfolioVoiceInterpretationError as exc:
+        LOGGER.warning(
+            "portfolio_voice_audio_interpretation_failed detail=%s user_id=%s audio_filename=%s audio_mime_type=%s audio_size_bytes=%s",
+            str(exc),
+            current_user.id,
+            audio.filename,
+            audio.content_type,
+            len(audio_bytes) if "audio_bytes" in locals() else 0,
+            extra={
+                "user_id": current_user.id,
+                "app_language_code": app_language_code,
+                "speech_locale_id": speech_locale_id,
+                "audio_filename": audio.filename,
+                "audio_mime_type": audio.content_type,
+                "audio_size_bytes": len(audio_bytes) if "audio_bytes" in locals() else 0,
+                "detail": str(exc),
+            },
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/notifications", response_model=NotificationListResponse)

@@ -55,9 +55,26 @@ async def ensure_runtime_tables(connection) -> None:
     await connection.execute(
         text(
             """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS rank_theme VARCHAR(24) NULL
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            ALTER TABLE community_profiles
+            ADD COLUMN IF NOT EXISTS rank_theme VARCHAR(24) NULL
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
             CREATE TABLE IF NOT EXISTS ai_provider_configs (
                 id SERIAL PRIMARY KEY,
                 provider VARCHAR(24) NOT NULL DEFAULT 'gemini',
+                usage_scope VARCHAR(24) NOT NULL DEFAULT 'default',
                 label VARCHAR(64) NOT NULL DEFAULT '',
                 api_key VARCHAR(512) NULL,
                 model VARCHAR(64) NOT NULL DEFAULT 'gemini-3-flash-preview',
@@ -66,6 +83,23 @@ async def ensure_runtime_tables(connection) -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            ALTER TABLE ai_provider_configs
+            ADD COLUMN IF NOT EXISTS usage_scope VARCHAR(24) NOT NULL DEFAULT 'default'
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            UPDATE ai_provider_configs
+            SET usage_scope = 'default'
+            WHERE COALESCE(BTRIM(usage_scope), '') = ''
             """
         )
     )
@@ -211,6 +245,14 @@ async def ensure_runtime_tables(connection) -> None:
             """
             ALTER TABLE ai_provider_configs
             ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 1
+            """
+        )
+    )
+    await connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_ai_provider_configs_provider_usage_scope_sort_order
+            ON ai_provider_configs (provider, usage_scope, sort_order)
             """
         )
     )

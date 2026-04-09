@@ -3,7 +3,8 @@ param(
     [string]$ListenHost = "0.0.0.0",
     [int]$Port = 8000,
     [int]$LandingPort = 8080,
-    [int]$BackendReadyTimeoutSeconds = 45
+    [int]$BackendReadyTimeoutSeconds = 45,
+    [string]$LandingRoot = "C:\Users\TILLO\xr-invest"
 )
 
 function Test-TcpEndpoint {
@@ -96,7 +97,6 @@ $tunnelStdOut = Join-Path $logDir "cloudflared-stdout.log"
 $tunnelStdErr = Join-Path $logDir "cloudflared-stderr.log"
 
 $backendScript = Join-Path $projectRoot "scripts\start_backend_for_tunnel.ps1"
-$landingRoot = Join-Path (Split-Path -Parent $projectRoot) "xrinvest-landing"
 $landingScript = Join-Path $landingRoot "preview.ps1"
 
 if ((Test-Path $landingRoot) -and (Test-Path $landingScript)) {

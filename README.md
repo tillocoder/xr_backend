@@ -126,9 +126,33 @@ Useful notes:
 
 - HTTP API example: `https://<name>.trycloudflare.com/api/v1/...`
 - WebSocket example: `wss://<name>.trycloudflare.com/api/v1/ws?user_id=<id>`
-- Media files will also resolve through the same public host.
+- If R2 is not configured, media files resolve through the same public host.
 - Permanent API domain example: `https://api.xrinvest.uz`
 - Set `XR_PUBLIC_BASE_URL=https://api.xrinvest.uz` so backend-generated media and websocket URLs use your real domain.
+
+## Cloudflare R2 media storage
+
+Community images, direct-message voice notes, direct-message full images, and learning video uploads can now be stored in Cloudflare R2 instead of the backend filesystem.
+
+Set these env vars to enable R2 storage:
+
+- `XR_R2_ACCOUNT_ID`
+- `XR_R2_ACCESS_KEY_ID`
+- `XR_R2_SECRET_ACCESS_KEY`
+- `XR_R2_BUCKET_NAME`
+- `XR_R2_PUBLIC_BASE_URL`
+- Optional: `XR_R2_ENDPOINT_URL` if you do not want it derived from `XR_R2_ACCOUNT_ID`
+- Optional: `XR_R2_REGION` (defaults to `auto`)
+
+Typical values:
+
+- `XR_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`
+- `XR_R2_PUBLIC_BASE_URL=https://<your-public-r2-domain>`
+
+Behavior:
+
+- When the R2 variables above are present, uploads are written to R2 and API responses return the public R2 URL.
+- When they are missing, the backend keeps the legacy local `/media/...` fallback so local development does not break unexpectedly.
 
 Firebase push default credential file is expected at:
 

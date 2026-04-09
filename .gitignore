@@ -29,5 +29,6 @@ media/chat_voice/
 media/community_posts/
 media/community_profiles/avatars/
 media/community_profiles/covers/
+media/learning-videos/
 media/test_delete_both/
 credentials/firebase-admin.json

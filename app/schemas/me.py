@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,12 +25,41 @@ class MeBootstrapPayload(BaseModel):
 
     settings: dict[str, Any] = Field(default_factory=dict)
     holdings: list[dict[str, Any]] = Field(default_factory=list)
-    linked_wallets: list[dict[str, Any]] = Field(
-        default_factory=list,
-        validation_alias="linkedWallets",
-        serialization_alias="linkedWallets",
-    )
+    linked_wallets: Annotated[
+        list[dict[str, Any]],
+        Field(
+            default_factory=list,
+            validation_alias="linkedWallets",
+            serialization_alias="linkedWallets",
+        ),
+    ]
     watchlist: list[str] = Field(default_factory=list)
+
+
+class PortfolioVoiceCommandRequest(BaseModel):
+    transcript: str = ""
+    appLanguageCode: str = "en"
+    speechLocaleId: str | None = None
+    source: str | None = None
+    submittedAt: datetime | None = None
+
+
+class PortfolioVoiceOperationResponse(BaseModel):
+    type: str = "add"
+    symbol: str
+    amount: float
+    buyPrice: float
+    buyAt: datetime | None = None
+    note: str | None = None
+    coinId: str | None = None
+    createdAt: datetime
+
+
+class PortfolioVoiceCommandResponse(BaseModel):
+    transcript: str
+    message: str | None = None
+    applyMode: str = "append"
+    operations: list[PortfolioVoiceOperationResponse] = Field(default_factory=list)
 
 
 class DailyRewardStatusResponse(BaseModel):
