@@ -34,7 +34,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.request_log_level)
 
-    app = FastAPI(title=settings.project_name, lifespan=lifespan)
+    app = FastAPI(
+        title=settings.project_name,
+        lifespan=lifespan,
+        openapi_url=settings.openapi_url_path,
+        docs_url=settings.docs_url_path,
+        redoc_url=settings.redoc_url_path,
+    )
     app.add_middleware(GZipMiddleware, minimum_size=max(256, settings.gzip_minimum_size_bytes))
     app.add_middleware(
         RateLimitMiddleware,
@@ -73,6 +79,7 @@ def create_app() -> FastAPI:
                 public_origin=settings.public_origin or current_origin,
                 project_name=settings.project_name,
                 api_prefix=settings.api_prefix,
+                show_api_docs=settings.api_docs_enabled,
             )
             return HTMLResponse(html)
 
@@ -88,7 +95,5 @@ def create_app() -> FastAPI:
         )
         app.include_router(admin_router, prefix=settings.api_prefix)
         app.include_router(learning_admin_router)
-    elif settings.admin_panel_enabled:
-        LOGGER.warning("admin_features_disabled_insecure_credentials")
     app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT), check_dir=False), name="media")
     return app

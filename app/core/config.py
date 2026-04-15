@@ -2,6 +2,7 @@ from pathlib import Path
 from functools import lru_cache
 from urllib.parse import urlparse
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -34,8 +35,10 @@ class Settings(BaseSettings):
     redis_pubsub_reconnect_delay_seconds: float = 1.0
     redis_pubsub_reconnect_max_delay_seconds: float = 30.0
     request_log_level: str = "INFO"
+    production_mode: bool = False
     gzip_minimum_size_bytes: int = 1024
     metrics_enabled: bool = True
+    api_docs_enabled: bool = True
     security_headers_enabled: bool = True
     rate_limit_enabled: bool = True
     rate_limit_window_seconds: int = 60
@@ -160,6 +163,18 @@ class Settings(BaseSettings):
         return self.admin_panel_enabled and self.admin_panel_has_secure_credentials
 
     @property
+    def openapi_url_path(self) -> str | None:
+        return "/openapi.json" if self.api_docs_enabled else None
+
+    @property
+    def docs_url_path(self) -> str | None:
+        return "/docs" if self.api_docs_enabled else None
+
+    @property
+    def redoc_url_path(self) -> str | None:
+        return "/redoc" if self.api_docs_enabled else None
+
+    @property
     def coordinated_runtime_services_enabled(self) -> bool:
         return self.redis_required_for_runtime or self.process_worker_count <= 1
 
@@ -172,6 +187,28 @@ class Settings(BaseSettings):
                 if value.strip()
             )
         )
+
+    @model_validator(mode="after")
+    def validate_runtime_security(self) -> "Settings":
+        if self.admin_panel_enabled and not self.admin_panel_has_secure_credentials:
+            raise ValueError(
+                "XR_ADMIN_PANEL_ENABLED=true requires a strong admin password and secret key."
+            )
+        if self.production_mode:
+            if self.allow_insecure_demo_auth:
+                raise ValueError(
+                    "XR_ALLOW_INSECURE_DEMO_AUTH=true is not allowed when XR_PRODUCTION_MODE=true."
+                )
+            if self.allow_insecure_demo_ws_user_id_auth:
+                raise ValueError(
+                    "XR_ALLOW_INSECURE_DEMO_WS_USER_ID_AUTH=true is not allowed when XR_PRODUCTION_MODE=true."
+                )
+            public_origin = self.public_origin
+            if public_origin and not public_origin.startswith("https://"):
+                raise ValueError(
+                    "XR_PUBLIC_BASE_URL must use https when XR_PRODUCTION_MODE=true."
+                )
+        return self
 
 
 @lru_cache

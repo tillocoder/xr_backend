@@ -516,8 +516,8 @@ class LearningService:
         )
         membership_tier = self._daily_rewards.effective_membership_tier_user(user)
         rank_theme = resolve_rank_theme(
-            user_rank_theme=user.rank_theme,
-            profile_rank_theme=profile.rank_theme if profile is not None else None,
+            user_rank_theme=getattr(user, "rank_theme", None),
+            profile_rank_theme=getattr(profile, "rank_theme", None) if profile is not None else None,
             membership_tier=membership_tier,
         )
         return LearningVideoPublisherResponse(
@@ -525,7 +525,11 @@ class LearningService:
             displayName=display_name,
             username=username,
             avatarUrl=public_media_url(
-                profile.avatar_url if profile is not None and profile.avatar_url else user.avatar_url,
+                (
+                    getattr(profile, "avatar_url", None)
+                    if profile is not None and getattr(profile, "avatar_url", None)
+                    else getattr(user, "avatar_url", None)
+                ),
                 self._public_base_url(),
             ),
             membershipTier=membership_tier,

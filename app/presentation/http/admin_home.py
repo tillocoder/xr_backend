@@ -9,6 +9,7 @@ def build_admin_home_html(
     public_origin: str,
     project_name: str,
     api_prefix: str,
+    show_api_docs: bool = True,
 ) -> str:
     safe_current_origin = escape(current_origin.rstrip("/"))
     safe_public_origin = escape((public_origin or current_origin).rstrip("/"))
@@ -38,14 +39,17 @@ def build_admin_home_html(
             "href": f"{canonical_origin}/health",
             "action": "Check Health",
         },
-        {
-            "eyebrow": "Reference",
-            "title": "API Docs",
-            "body": "Open Swagger docs to inspect endpoints, schemas, and admin API routes.",
-            "href": f"{canonical_origin}/docs",
-            "action": "Open Docs",
-        },
     ]
+    if show_api_docs:
+        cards.append(
+            {
+                "eyebrow": "Reference",
+                "title": "API Docs",
+                "body": "Open Swagger docs to inspect endpoints, schemas, and admin API routes.",
+                "href": f"{canonical_origin}/docs",
+                "action": "Open Docs",
+            }
+        )
 
     cards_html = "".join(
         f"""
@@ -58,6 +62,12 @@ def build_admin_home_html(
         """
         for card in cards
     )
+
+    docs_button_html = ""
+    if show_api_docs:
+        docs_button_html = (
+            f'\n        <a class="button button-secondary" href="{safe_public_origin}/docs">Open API Docs</a>'
+        )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -278,7 +288,7 @@ def build_admin_home_html(
       </p>
       <div class="hero-actions">
         <a class="button button-primary" href="{safe_public_origin}/admin-panel/">Enter Admin Panel</a>
-        <a class="button button-secondary" href="{safe_public_origin}/docs">Open API Docs</a>
+{docs_button_html}
       </div>
       <div class="meta-grid">
         <article class="meta-card">

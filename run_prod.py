@@ -53,6 +53,8 @@ if __name__ == "__main__":
     if os.name == "nt" and _env_bool("XR_BACKEND_FORCE_WINDOWS_SELECTOR_EVENT_LOOP", True):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     args = _parse_args()
+    os.environ.setdefault("XR_PRODUCTION_MODE", "true")
+    os.environ.setdefault("XR_API_DOCS_ENABLED", "false")
     redis_required_for_runtime = _env_bool("XR_REDIS_REQUIRED_FOR_RUNTIME", True)
     os.environ["XR_REDIS_REQUIRED_FOR_RUNTIME"] = "true" if redis_required_for_runtime else "false"
     os.environ.setdefault("XR_WEBSOCKET_RATE_LIMIT_MAX_CONNECTS_PER_IP", "120")

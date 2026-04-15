@@ -52,6 +52,8 @@ Recommended production notes:
 - Use a paid Gemini quota or disable Gemini-dependent background paths for production stability.
 - Put the backend behind Nginx or Cloudflare with websocket proxying enabled and a high file-descriptor limit on the host OS.
 - Start with `4` workers for a `10k` websocket target and measure Prometheus websocket metrics before increasing further.
+- `run_prod.py` now defaults to `XR_PRODUCTION_MODE=true` and `XR_API_DOCS_ENABLED=false` so insecure demo auth and public Swagger exposure do not slip into production by accident.
+- Set `XR_PUBLIC_BASE_URL=https://api.your-domain.tld` in production so generated websocket/media URLs stay stable behind proxies.
 
 For quick local throwaway runs you can skip Alembic and let FastAPI create tables:
 
@@ -82,6 +84,8 @@ Credentials are controlled via env vars (defaults are dev-only):
 - `XR_ADMIN_PANEL_USERNAME`
 - `XR_ADMIN_PANEL_PASSWORD`
 - `XR_ADMIN_PANEL_SECRET_KEY` (cookie signing key)
+
+If `XR_ADMIN_PANEL_ENABLED=true`, the backend now fails fast on startup unless the password and secret key are strong enough for production use.
 
 ## AI news translation (Gemini)
 
@@ -214,6 +218,12 @@ This launcher is idempotent:
 
 This scaffold uses `X-User-Id` for HTTP and `?user_id=` for WebSocket auth.
 Replace it with JWT/session validation before production.
+
+When `XR_PRODUCTION_MODE=true`, the backend now rejects:
+
+- `XR_ALLOW_INSECURE_DEMO_AUTH=true`
+- `XR_ALLOW_INSECURE_DEMO_WS_USER_ID_AUTH=true`
+- non-HTTPS `XR_PUBLIC_BASE_URL`
 
 ## Alembic
 
